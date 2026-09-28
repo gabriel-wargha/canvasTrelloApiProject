@@ -15,7 +15,7 @@ One command, `dotnet run`, opens a **colorful terminal app**. From its menu I ca
 2. Creates a Trello card for each one in the **Later** list.
 3. **Two-way sync:** when I submit an assignment on Canvas, the next sync moves its card to **Done**. The app creates the Done list itself if it is missing.
 4. Remembers everything in `sync-state.json`, so it never creates duplicates and keeps a sync history.
-5. `--mock` mode uses fake data (with due dates), so I can demo it without Canvas.
+5. `dotnet run -- --dry-run` makes the whole session safe: every sync is only a preview, and nothing changes on Trello.
 
 ### Terminal (Spectre.Console)
 
@@ -78,13 +78,12 @@ One command, `dotnet run`, opens a **colorful terminal app**. From its menu I ca
 ## 2. Architecture
 
 ```
-dotnet run [--mock]
+dotnet run [--dry-run]
    │
    ▼
 Program.cs ── loads user-secrets, builds the objects below
    │
    ├── ITaskSource ◄── CanvasClient      (real Canvas Network)
-   │               ◄── MockTaskSource    (fake data, --mock)
    ├── ITaskBoard  ◄── TrelloClient
    ├── SyncStateStore  (sync-state.json: card map + history)
    ├── SyncService     (the engine: one sync at a time, locked)
@@ -100,7 +99,7 @@ CanvasTrelloSync/
 ├── Models/        Course, Assignment, Submission, TrelloList, TrelloCard,
 │                  SyncState, SyncedCard, SyncRun, CourseProgress
 ├── Interfaces/    ITaskSource, ITaskBoard
-├── Clients/       CanvasClient, TrelloClient, MockTaskSource
+├── Clients/       CanvasClient, TrelloClient
 ├── Services/      SyncStateStore, SyncService
 ├── UI/            Menu
 └── Web/           DashboardServer, wwwroot/
@@ -109,7 +108,7 @@ CanvasTrelloSync.Tests/   xUnit tests for SyncService (fake source + fake board)
 
 ### Sync rules (the heart of the app)
 
-The rules table lives in [`AGENTS.md` → Sync rules](../AGENTS.md#sync-rules). In short: new unsubmitted assignment → create card; submitted assignment with an open card → move it to Done; everything else → skip.
+A new, not submitted assignment gets a card in Later. A submitted assignment whose card is still open gets moved to Done. Everything else is skipped.
 
 The state file maps each `assignment id → { cardId, cardUrl, done, syncedAt }` and keeps the last 50 `SyncRun`s (time, source terminal/web, created, moved, skipped).
 
@@ -119,7 +118,7 @@ The state file maps each `assignment id → { cardId, cardUrl, done, syncedAt }`
 
 | Requirement | Where |
 |---|---|
-| Conditionals | sync rules table, menu `switch`, secret checks |
+| Conditionals | sync rules, menu `switch`, secret checks, `--dry-run` flag |
 | Loops | menu `while`, pagination `while`, `foreach` over courses/assignments |
 | Functions | `SyncAsync`, `GetAllPagesAsync`, `CreateCardAsync`, `MoveCardAsync`, … |
 | Classes | clients, services, models, `Menu`, `DashboardServer` |
@@ -139,24 +138,24 @@ Each block: Claude asks questions first → writes code → builds and tests →
 - Add packages: `Spectre.Console`, ASP.NET Core framework reference.
 - Finish models (`TrelloList`, `TrelloCard`), interfaces `ITaskSource` / `ITaskBoard`.
 - `CanvasClient` with Bearer auth, `include[]=submission`, and Link-header pagination.
-- `MockTaskSource` with due dates, plus a way to "submit" a fake assignment (for the two-way demo).
+- Read the `--dry-run` flag in `Program.cs`.
 - Temporary `Program.cs` prints courses and assignments in a Spectre table.
-- **Done when:** `dotnet run` shows my real Canvas Network courses and their assignments with todo/done status, and `dotnet run -- --mock` shows the fake ones.
+- **Done when:** `dotnet run -- --dry-run` shows my real Canvas Network courses and their assignments with todo/done status.
 
 ### Block 2 — Trello client (1h)
 - `TrelloClient`: get lists, **ensure the Done list exists**, create card (returns id + url), move card, get cards on a list.
 - **Done when:** a throwaway test creates a test card in Later, moves it to Done, and deletes it, and I saw each step on the real board.
 
 ### Block 3 — Sync engine + tests (1h)
-- `SyncState`, `SyncStateStore` (`sync-state.json`, `sync-state.mock.json`).
+- `SyncState`, `SyncStateStore` (`sync-state.json`).
 - `SyncService.SyncAsync(dryRun, source)` applying the sync rules, writing history, and locked so the terminal and web never sync at the same time.
 - xUnit project with fake source/board. Tests: creates new, skips existing, moves submitted to Done, dry run changes nothing, second sync creates 0.
 - **Done when:** `dotnet test` is all green.
 
 ### Block 4 — Beautiful terminal UI (1h)
 - Spectre menu (arrow keys), header with FigletText, tables, spinner + progress bar during sync, result panel, history table, reset with confirmation, red error panels (bad token, missing list).
-- Mock-only menu item: "Pretend I submitted an assignment".
-- **Done when:** full demo in `--mock`: sync → pretend submit → sync → the card moves to Done, and everything looks clean.
+- When started with `--dry-run`, the header shows a yellow **DRY RUN** badge and "Sync to Trello" only previews.
+- **Done when:** with `--dry-run`, every menu item works and looks clean, and the preview shows the cards it would create or move.
 
 ### Block 5 — Web API inside the app (1h)
 - `DashboardServer` starts Kestrel on `localhost:5080` in the background, with quiet logs so the menu is not messed up.
@@ -169,16 +168,17 @@ Each block: Claude asks questions first → writes code → builds and tests →
 - **Done when:** Claude opens the page in Chrome, clicks Sync now, and a screenshot shows all four sections updated.
 
 ### Block 7 — Real test, polish, README, demo (1h)
-- Run the testing checklist against real Canvas Network + Trello.
+- Run the testing checklist against real Canvas Network + Trello (with my OK).
+- Demo two-way sync: submit one real Canvas Network assignment, sync, and watch its card move to Done.
 - `/code-review` and `/simplify` pass; fix findings.
 - README section with screenshots, run steps, and APIs used; demo video script (3–4 min).
 - **Done when:** checklist below is all ticked and the README is committed.
 
 ### Testing checklist
-- [ ] Courses and assignments list correctly (real + mock)
-- [ ] Dry run creates nothing in Trello
+- [ ] Courses and assignments list correctly
+- [ ] Dry run (menu preview and `--dry-run`) creates nothing in Trello
 - [ ] First sync creates cards; second sync creates **0**
-- [ ] Submitting (mock) → next sync moves card to Done
+- [ ] Submitting a real assignment → next sync moves card to Done
 - [ ] Done list is created automatically when missing
 - [ ] Bad token → red error panel, no crash
 - [ ] Dashboard: all 4 sections, Sync now works, history shows "web"

@@ -22,7 +22,7 @@ This is the single source of truth for how CanvasTrelloSync talks to both APIs. 
 **Pagination.** Results come in pages. Keep following the `Link` response header's `rel="next"` URL until there is none. The URL is absolute, so request it as-is. Format: `<https://…&page=2>; rel="next", <https://…>; rel="last"`.
 
 **Gotchas**
-- Canvas Network courses are self-paced, so `due_at` is always `null`. The app therefore syncs by submission state, not by date. Only `MockTaskSource` has due dates.
+- Canvas Network courses are self-paced, so `due_at` is always `null`. The app therefore syncs by submission state, not by date.
 - Treat `workflow_state` values `submitted`, `graded`, and `pending_review` as submitted. `unsubmitted` means todo.
 - Some courses refuse assignment access (401/403). Skip that one course with a warning and keep syncing the rest.
 - `401` on `courses` means a bad or expired token.
