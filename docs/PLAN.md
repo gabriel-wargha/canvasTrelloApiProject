@@ -1,7 +1,7 @@
 # CanvasTrelloSync — Plan (v2)
 
 Rebuilt 2026-09-28. The teacher allows full AI use: Claude writes and runs the code, and I review and understand every outcome.
-Budget: **7 hours = 7 blocks of about 1 hour**.
+Budget: **8 hours = 8 blocks of about 1 hour**.
 
 ---
 
@@ -85,7 +85,8 @@ Program.cs ── loads user-secrets, builds the objects below
    │
    ├── ITaskSource ◄── CanvasClient      (real Canvas Network)
    ├── ITaskBoard  ◄── TrelloClient
-   ├── SyncStateStore  (sync-state.json: card map + history)
+   ├── ISyncStateStore ◄── JsonSyncStateStore  (sync-state.json, Block 3)
+   │                   ◄── SqliteSyncStateStore (canvas-trello.db, Block 8)
    ├── SyncService     (the engine: one sync at a time, locked)
    │      ▲        ▲
    │      │        │
@@ -100,7 +101,7 @@ CanvasTrelloSync/
 │                  SyncState, SyncedCard, SyncRun, CourseProgress
 ├── Interfaces/    ITaskSource, ITaskBoard
 ├── Clients/       CanvasClient, TrelloClient
-├── Services/      SyncStateStore, SyncService
+├── Services/      ISyncStateStore, JsonSyncStateStore, SqliteSyncStateStore, SyncService
 ├── UI/            Menu
 └── Web/           DashboardServer, wwwroot/
 CanvasTrelloSync.Tests/   xUnit tests for SyncService (fake source + fake board)
@@ -124,12 +125,13 @@ The state file maps each `assignment id → { cardId, cardUrl, done, syncedAt }`
 | Classes | clients, services, models, `Menu`, `DashboardServer` |
 | Data structures | `List<Assignment>`, `Dictionary<long, SyncedCard>`, `Dictionary<string,string>` (list name → id) |
 | Stretch: interfaces | `ITaskSource`, `ITaskBoard` |
-| Bonus: files | `SyncStateStore` reads/writes JSON |
+| Bonus: files | `JsonSyncStateStore` reads/writes JSON |
+| Bonus: database | `SqliteSyncStateStore`: SQLite with `CREATE TABLE`, `INSERT`, `UPDATE`, `SELECT` |
 | Bonus: tests | `CanvasTrelloSync.Tests` |
 
 ---
 
-## 4. The 7 blocks
+## 4. The 8 blocks
 
 Each block: Claude asks questions first → writes code → builds and tests → **explains the outcome in simple English** → one git commit.
 "Done when" is the check that must pass before the block ends.
@@ -147,7 +149,7 @@ Each block: Claude asks questions first → writes code → builds and tests →
 - **Done when:** a throwaway test creates a test card in Later, moves it to Done, and deletes it, and I saw each step on the real board.
 
 ### Block 3 — Sync engine + tests (1h)
-- `SyncState`, `SyncStateStore` (`sync-state.json`).
+- `SyncState`, an `ISyncStateStore` interface, and `JsonSyncStateStore` (`sync-state.json`). The interface lets Block 8 swap JSON for SQLite without touching `SyncService`.
 - `SyncService.SyncAsync(dryRun, source)` applying the sync rules, writing history, and locked so the terminal and web never sync at the same time.
 - xUnit project with fake source/board. Tests: creates new, skips existing, moves submitted to Done, dry run changes nothing, second sync creates 0.
 - **Done when:** `dotnet test` is all green.
@@ -174,6 +176,34 @@ Each block: Claude asks questions first → writes code → builds and tests →
 - README section with screenshots, run steps, and APIs used; demo video script (3–4 min).
 - **Done when:** checklist below is all ticked and the README is committed.
 
+### Block 8 — SQLite database (1h)
+Swap the JSON file for a small **SQLite** database: one file (`canvas-trello.db`), with no server to install.
+- Add the `Microsoft.Data.Sqlite` package. Use plain SQL, with no ORM, so the SQL stays visible for learning.
+- Two tables:
+  ```sql
+  CREATE TABLE synced_cards (
+      assignment_id INTEGER PRIMARY KEY,
+      card_id       TEXT NOT NULL,
+      card_url      TEXT,
+      done          INTEGER NOT NULL DEFAULT 0,   -- 0 = open, 1 = moved to Done
+      synced_at     TEXT NOT NULL
+  );
+  CREATE TABLE sync_runs (
+      id        INTEGER PRIMARY KEY AUTOINCREMENT,
+      ran_at    TEXT NOT NULL,
+      trigger   TEXT NOT NULL,                   -- 'terminal' or 'web'
+      created   INTEGER NOT NULL,
+      moved     INTEGER NOT NULL,
+      skipped   INTEGER NOT NULL
+  );
+  ```
+- `SqliteSyncStateStore` implements `ISyncStateStore`: it creates the tables on first run, and uses parameterized queries (`@id`) to avoid SQL injection.
+- On first start, if `sync-state.json` exists, import it into the database once, so no card is duplicated.
+- `Program.cs` switches to `SqliteSyncStateStore`. `SyncService`, the menu and the dashboard stay unchanged.
+- Tests: run the same store tests against an in-memory SQLite database (`Data Source=:memory:`).
+- Add `*.db` to `.gitignore`.
+- **Done when:** `dotnet test` is green, a sync writes rows that `sqlite3 canvas-trello.db "SELECT * FROM synced_cards;"` shows, and a second sync still creates 0 cards.
+
 ### Testing checklist
 - [ ] Courses and assignments list correctly
 - [ ] Dry run (menu preview and `--dry-run`) creates nothing in Trello
@@ -183,6 +213,7 @@ Each block: Claude asks questions first → writes code → builds and tests →
 - [ ] Bad token → red error panel, no crash
 - [ ] Dashboard: all 4 sections, Sync now works, history shows "web"
 - [ ] `dotnet test` green
+- [ ] Block 8: rows appear in `synced_cards` and `sync_runs`; old JSON history was imported
 
 ---
 

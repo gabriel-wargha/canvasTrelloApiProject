@@ -485,3 +485,6 @@ $RECYCLE.BIN/
 
 # CanvasTrelloSync local sync history
 sync-state*.json
+
+# CanvasTrelloSync SQLite database (Block 8)
+*.db

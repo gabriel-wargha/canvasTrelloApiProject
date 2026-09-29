@@ -10,7 +10,7 @@ The app reads my not submitted assignments from Canvas Network and creates a Tre
 
 You can use it in two ways: a **terminal menu**, or a **web dashboard** at `localhost:5080` that opens from the menu.
 
-The plan is in [`docs/PLAN.md`](docs/PLAN.md): 7 blocks, each with a **Done when** check. Only work on the block I ask for.
+The plan is in [`docs/PLAN.md`](docs/PLAN.md): 8 blocks, each with a **Done when** check. Only work on the block I ask for.
 
 ## Commands
 
