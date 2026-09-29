@@ -1,7 +1,7 @@
 # CanvasTrelloSync — Plan (v2)
 
 Rebuilt 2026-09-28. The teacher allows full AI use: Claude writes and runs the code, and I review and understand every outcome.
-Budget: **8 hours = 8 blocks of about 1 hour**.
+Budget: **8 hours = 8 blocks of about 1 hour**, plus 2 extra blocks (9 and 10) added on 2026-09-29.
 
 ---
 
@@ -207,6 +207,17 @@ Swap the JSON file for a small **SQLite** database: one file (`canvas-trello.db`
 - Add `*.db` to `.gitignore`.
 - **Done when:** `dotnet test` is green, a sync writes rows that `sqlite3 canvas-trello.db "SELECT * FROM synced_cards;"` shows, and a second sync still creates 0 cards.
 
+### Block 9 — Polish: short names, course colors, automatic tests (1h)
+- **Short course names:** long Canvas codes like `PD-0141-ENHANCING-LEARNING-COMPUTER-SCIENCE-AND-MATHEMATICS` become `PD-0141` in the terminal, the dashboard and new Trello card titles. One function decides the short name, with tests. (Ask at block start: rename existing cards too, or only new ones?)
+- **Course colors on Trello:** each course gets a colored Trello **label** (created on the board if missing), in the same color order as the dashboard. New cards get their course's label.
+- **Automatic tests on GitHub:** a GitHub Actions workflow (`.github/workflows/tests.yml`) runs `dotnet build` and `dotnet test` on every push, and a green badge appears in the README.
+- **Done when:** the GitHub Actions run is green with its badge in the README, a dry run shows short names, and after a real sync (with my OK) new cards show a short name and a course color label on Trello.
+
+### Block 10 — Smart extras: finish-date forecast, Mac notifications (1h)
+- **Finish-date forecast:** read each submission's `submitted_at` from Canvas and compute my pace per course (assignments per week, last 14 days). The dashboard Overview and the terminal show "At your pace: done around Oct 20", or "Not enough data yet" when there are no recent submissions. The calculation is a plain function with tests (fixed dates, no real clock).
+- **Mac notifications:** after a real sync that created or moved cards, macOS shows a notification ("3 new cards · 1 moved to Done"). Behind a small interface, so tests use a fake; nothing is shown in a dry run or on other systems.
+- **Done when:** `dotnet test` is green, the forecast appears with my real Canvas data, and a real sync that changes something shows a Mac notification.
+
 ### Testing checklist
 - [ ] Courses and assignments list correctly
 - [ ] Dry run (menu preview and `--dry-run`) creates nothing in Trello
@@ -236,7 +247,5 @@ Swap the JSON file for a small **SQLite** database: one file (`canvas-trello.db`
 ---
 
 ## 6. Optional extras (if time is left)
-- Trello label per course (color by course)
-- Short course labels (Canvas Network codes can be long)
 - Choose which courses to sync
 - Watch mode: auto-sync every X minutes while the dashboard is open
