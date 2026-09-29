@@ -15,7 +15,8 @@ One command, `dotnet run`, opens a **colorful terminal app**. From its menu I ca
 2. Creates a Trello card for each one in the **Later** list.
 3. **Two-way sync:** when I submit an assignment on Canvas, the next sync moves its card to **Done**. The app creates the Done list itself if it is missing.
 4. Remembers everything in `sync-state.json`, so it never creates duplicates and keeps a sync history.
-5. `dotnet run -- --dry-run` makes the whole session safe: every sync is only a preview, and nothing changes on Trello.
+5. `dotnet run -- --dry-run` makes the whole session safe: every sync is only a preview, and nothing changes on Trello or in the sync state.
+6. Flags for running without the menu: `--sync` runs one sync, prints the result and exits; `--web` starts only the dashboard. Both combine with `--dry-run`.
 
 ### Terminal (Spectre.Console)
 
@@ -78,7 +79,7 @@ One command, `dotnet run`, opens a **colorful terminal app**. From its menu I ca
 ## 2. Architecture
 
 ```
-dotnet run [--dry-run]
+dotnet run [--dry-run] [--sync | --web]
    │
    ▼
 Program.cs ── loads user-secrets, builds the objects below
@@ -133,7 +134,7 @@ The state file maps each `assignment id → { cardId, cardUrl, done, syncedAt }`
 
 ## 4. The 8 blocks
 
-Each block: Claude asks questions first → writes code → builds and tests → **explains the outcome in simple English** → one git commit.
+Each block: Claude asks questions first → writes code → builds and tests → **explains the outcome in simple English** → one git commit (only when I say so).
 "Done when" is the check that must pass before the block ends.
 
 ### Block 1 — Foundation + Canvas (1h)
@@ -150,20 +151,22 @@ Each block: Claude asks questions first → writes code → builds and tests →
 
 ### Block 3 — Sync engine + tests (1h)
 - `SyncState`, an `ISyncStateStore` interface, and `JsonSyncStateStore` (`sync-state.json`). The interface lets Block 8 swap JSON for SQLite without touching `SyncService`.
-- `SyncService.SyncAsync(dryRun, source)` applying the sync rules, writing history, and locked so the terminal and web never sync at the same time.
-- xUnit project with fake source/board. Tests: creates new, skips existing, moves submitted to Done, dry run changes nothing, second sync creates 0.
+- `SyncService.SyncAsync(dryRun, source)` applying the sync rules, writing history, and locked so the terminal and web never sync at the same time. A dry run writes nothing: no Trello calls that change the board, and no state or history saved.
+- xUnit project with fake source/board. Tests: creates new, skips existing, moves submitted to Done, dry run changes nothing, second sync creates 0, dry run leaves the state file unchanged.
 - **Done when:** `dotnet test` is all green.
 
 ### Block 4 — Beautiful terminal UI (1h)
 - Spectre menu (arrow keys), header with FigletText, tables, spinner + progress bar during sync, result panel, history table, reset with confirmation, red error panels (bad token, missing list).
 - When started with `--dry-run`, the header shows a yellow **DRY RUN** badge and "Sync to Trello" only previews.
-- **Done when:** with `--dry-run`, every menu item works and looks clean, and the preview shows the cards it would create or move.
+- `--sync` flag: skip the menu, run one sync with the same spinner and result panel, then exit (exit code 1 on an API error). This lets Claude check the sync without pressing keys.
+- **Done when:** `dotnet run -- --sync --dry-run` prints the cards it would create or move and exits, and (checked by me) with `--dry-run` every menu item works and looks clean.
 
 ### Block 5 — Web API inside the app (1h)
 - `DashboardServer` starts Kestrel on `localhost:5080` in the background, with quiet logs so the menu is not messed up.
 - Endpoints: `GET /api/summary`, `/api/assignments`, `/api/board`, `/api/history`, `POST /api/sync`.
 - Menu "Open web dashboard" starts the server once and opens the browser.
-- **Done when:** with the menu still usable, `curl` on every endpoint returns correct JSON, and `POST /api/sync` adds a "web" row to history.
+- `--web` flag: start only the dashboard, without the menu, until Ctrl+C.
+- **Done when:** with `dotnet run -- --web --dry-run` running (and, checked by me, with the menu still usable), `curl` on every endpoint returns correct JSON, and `POST /api/sync` adds a "web" row to history.
 
 ### Block 6 — Dashboard page (1h)
 - `wwwroot/index.html` + `app.js` + `styles.css` (no build step): progress bars per course, to-do list with Canvas/Trello links, Later/Done board mirror, Sync-now button with spinner, history table, light/dark mode, works on a phone-width window.

@@ -17,22 +17,21 @@ The plan is in [`docs/PLAN.md`](docs/PLAN.md): 8 blocks, each with a **Done when
 Run these from inside `CanvasTrelloSync/`:
 
 ```bash
-dotnet build
-# Compiles the project. Must have zero errors before you touch anything else. Run this first after any change — it's the fastest way to catch typos and missing references before wasting time on a full `dotnet run`.
+dotnet build                     # compile; zero errors before anything else
+dotnet test ../CanvasTrelloSync.Tests   # xUnit suite (fakes, no real APIs)
+dotnet format                    # tidy formatting before a commit
 
-dotnet run -- --dry-run
-# Safe default while developing. Reads real Canvas but changes nothing on Trello — it only prints what it would create or move. Use this to check a block's "Done when" check before touching the real board.
-
-dotnet run
-# Starts the app for real: hits the live Canvas API and writes to the live Trello board. Only use this when I've explicitly asked to sync my real data (see Boundaries). Never use this as your default while building or testing a block — use --dry-run instead.
-
-dotnet test ../CanvasTrelloSync.Tests
-# Runs the xUnit test suite. Must pass before every commit — no exceptions, and never delete or skip a failing test to force a pass (see Boundaries). This is what verifies the sync logic, using FakeTaskSource/FakeTaskBoard, not the real APIs.
+dotnet run -- --dry-run          # interactive menu, every sync is a preview
+dotnet run -- --sync --dry-run   # one preview sync, prints the result, exits
+dotnet run -- --web --dry-run    # dashboard only on localhost:5080 (Ctrl+C to stop)
+dotnet run                       # real sync to my live Trello board
 ```
+
+The menu waits for arrow keys, so you can't drive it. Use `--sync` or `--web` to run and check things yourself. (These flags arrive in Blocks 4 and 5; before that, `--dry-run` prints tables and exits.)
 
 ## Tech stack
 
-- C# 12 / .NET 8 (SDK pinned in `global.json`)
+- C# 12 / .NET 8 (SDK pinned in `global.json`), `<Nullable>enable</Nullable>`
 - Spectre.Console for the terminal menu
 - ASP.NET Core Minimal API + plain HTML/CSS/JS for the dashboard
 - `HttpClient` + `System.Text.Json` for the Canvas and Trello REST APIs
@@ -43,21 +42,40 @@ dotnet test ../CanvasTrelloSync.Tests
 
 ```
 CanvasTrelloSync/
-├── Program.cs       loads secrets and starts the menu
+├── Program.cs       loads secrets, reads flags, starts the menu
 ├── Models/          data classes (Course, Assignment, ...)
 ├── Interfaces/      ITaskSource, ITaskBoard
 ├── Clients/         CanvasClient, TrelloClient
-├── Services/        SyncService, SyncStateStore
+├── Services/        SyncService, sync state stores
 ├── UI/              the terminal menu
 └── Web/             the dashboard
 CanvasTrelloSync.Tests/   tests
 ```
+
+## APIs and secrets
+
+Canvas and Trello details (endpoints, auth, pagination, gotchas) live in the `api-reference` skill at [`.claude/skills/api-reference/SKILL.md`](.claude/skills/api-reference/SKILL.md). Read it before writing or debugging Canvas or Trello code.
+
+- Canvas base URL: `https://learn.canvas.net` (API under `/api/v1/`).
+- Secrets are read by key name from `dotnet user-secrets`. Use these names in code; you never need the values:
+  `Canvas:BaseUrl`, `Canvas:Token`, `Trello:ApiKey`, `Trello:ApiToken`, `Trello:BoardId`.
+- The Canvas token goes in the `Authorization` header. The Trello key and token go in the URL query string.
+
+## Sync state
+
+The sync state links each Canvas assignment to its Trello card: `assignment id → { cardId, cardUrl, done, syncedAt }`, plus the last 50 sync runs.
+
+- Blocks 3–7: `CanvasTrelloSync/sync-state.json`
+- Block 8 onward: `CanvasTrelloSync/canvas-trello.db` (SQLite)
+
+A dry run is read-only: it reads Canvas and the state, and writes nothing, not to Trello and not to the state file or database. "Reset sync history" means deleting that state file or database.
 
 ## Code style
 
 - File-scoped namespaces, and one class per file.
 - Async methods end in `Async`, and private fields start with `_`.
 - Short comments that say _why_.
+- Nullable is on: handle `null` with checks or `?? default`. Keep the `!` operator out of the code.
 
 ```csharp
 // Good: clear name, async, checks the response
@@ -83,15 +101,23 @@ Errors: clients throw `HttpRequestException`. The menu shows it in a red panel, 
 - Name tests like `Method_Condition_ExpectedResult`.
 - To fix a bug, first write a test that fails, then fix the code.
 
-## Git workflow
+## Workflow
 
 1. Before a block, ask me about anything that is not clear.
-2. Build, test, and run the app until the block's **Done when** check passes.
+2. Build, test, and run with `--dry-run` until the block's **Done when** check passes.
 3. Explain what changed in simple words, with a small example and a command to try.
+
+## Git
+
+- Commit only when I ask. Suggest the commit message and wait for my OK.
+- One commit per block, after `dotnet build`, `dotnet test` and `dotnet format` all pass.
+- Message: a short summary line (`Block 3: sync engine with JSON state and tests`), then a few `- ` bullets of what changed.
+- Keep `sync-state*.json`, `*.db` and secrets out of commits (already in `.gitignore`).
 
 ## Boundaries
 
-- **Always:** use `--dry-run` while building, run `dotnet test` before committing, and load the `api-reference` skill before writing Canvas or Trello code.
-- **Ask first:** syncing to my real Trello board, deleting cards, resetting the sync history, or adding a NuGet package.
-- **Never:** commit secrets, print full Trello URLs (the token is in them) or delete a failing test to make the build pass.
-- **When stuck:** if a test fails and you can't find the cause after a couple of tries, stop and ask me. Don't delete or skip the test.
+- **Always:** use `--dry-run` while building, and run `dotnet test` before committing.
+- **Ask first:** syncing to my real Trello board (`dotnet run` without `--dry-run`), deleting cards, resetting the sync history, or adding a NuGet package.
+- **Secrets:** refer to secrets by key name only. Keep tokens, keys, `Authorization` headers and full Trello URLs out of output, logs, commits and error messages (log the URL path only). Don't run `dotnet user-secrets list`, because it prints the real values.
+- **Failing tests:** fix the code, never the test. Don't delete, skip, or weaken a failing test (for example by loosening its assert) to make it pass.
+- **When stuck:** if a test still fails after a couple of tries, stop and ask me.
