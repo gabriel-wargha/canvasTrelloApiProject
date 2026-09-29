@@ -75,7 +75,6 @@ A dry run is read-only: it reads Canvas and the state, and writes nothing, not t
 - File-scoped namespaces, and one class per file.
 - Async methods end in `Async`, and private fields start with `_`.
 - Short comments that say _why_.
-- Nullable is on: handle `null` with checks or `?? default`. Keep the `!` operator out of the code.
 
 ```csharp
 // Good: clear name, async, checks the response
