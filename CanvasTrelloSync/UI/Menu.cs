@@ -1,8 +1,10 @@
+using System.Diagnostics;
 using System.Net;
 using System.Text.Json;
 using CanvasTrelloSync.Interfaces;
 using CanvasTrelloSync.Models;
 using CanvasTrelloSync.Services;
+using CanvasTrelloSync.Web;
 using Spectre.Console;
 
 namespace CanvasTrelloSync.UI;
@@ -15,19 +17,22 @@ public class Menu
     private const string PreviewSync = "👀  Preview sync (dry run)";
     private const string RealSync = "🔄  Sync to Trello";
     private const string DryRunSync = "🔄  Sync to Trello (preview only)";
+    private const string OpenDashboard = "🌐  Open web dashboard";
     private const string History = "🕒  Sync history";
     private const string Reset = "🧹  Reset sync history";
     private const string Exit = "🚪  Exit";
 
     private readonly SyncService _sync;
     private readonly ITaskBoard _board;
+    private readonly DashboardServer _dashboard;
     private readonly bool _dryRun;
     private string _boardName = "?";
 
-    public Menu(SyncService sync, ITaskBoard board, bool dryRun)
+    public Menu(SyncService sync, ITaskBoard board, DashboardServer dashboard, bool dryRun)
     {
         _sync = sync;
         _board = board;
+        _dashboard = dashboard;
         _dryRun = dryRun;
     }
 
@@ -45,10 +50,11 @@ public class Menu
             string choice = AnsiConsole.Prompt(new SelectionPrompt<string>()
                 .Title("What do you want to do?")
                 .HighlightStyle(new Style(Color.DodgerBlue1))
-                .AddChoices(ListCourses, ListAssignments, PreviewSync, _dryRun ? DryRunSync : RealSync, History, Reset, Exit));
+                .AddChoices(ListCourses, ListAssignments, PreviewSync, _dryRun ? DryRunSync : RealSync, OpenDashboard, History, Reset, Exit));
 
             if (choice == Exit)
             {
+                await _dashboard.DisposeAsync();
                 AnsiConsole.MarkupLine("👋 Bye!");
                 return 0;
             }
@@ -69,6 +75,9 @@ public class Menu
                     case RealSync:
                     case DryRunSync:
                         await SyncWithProgressAsync(_dryRun);
+                        break;
+                    case OpenDashboard:
+                        await OpenDashboardAsync();
                         break;
                     case History:
                         await ShowHistoryAsync();
@@ -145,6 +154,8 @@ public class Menu
 
         AnsiConsole.MarkupLine(
             $"[grey]Source:[/] Canvas Network   [grey]Board:[/] {Markup.Escape(_boardName)}   [grey]Last sync:[/] {lastSync}");
+        if (_dashboard.IsRunning)
+            AnsiConsole.MarkupLine($"[grey]Dashboard:[/] [link]{_dashboard.Url}[/]");
         if (_dryRun)
             AnsiConsole.MarkupLine("[black on yellow] DRY RUN [/] [yellow]Every sync is a preview: nothing changes on Trello or in sync-state.json.[/]");
         AnsiConsole.WriteLine();
@@ -260,6 +271,16 @@ public class Menu
         ShowFailedCourses(result.FailedCourses);
         if (result.DryRun)
             AnsiConsole.MarkupLine("[yellow]Dry run: nothing was changed.[/]");
+    }
+
+    private async Task OpenDashboardAsync()
+    {
+        // The server starts once and keeps running while the menu is open
+        await _dashboard.StartAsync();
+        AnsiConsole.MarkupLine($"[green]Dashboard running at[/] [link]{_dashboard.Url}[/]");
+
+        // UseShellExecute hands the URL to macOS/Windows, which opens the default browser
+        Process.Start(new ProcessStartInfo(_dashboard.Url) { UseShellExecute = true });
     }
 
     private async Task ShowHistoryAsync()

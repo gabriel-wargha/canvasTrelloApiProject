@@ -11,6 +11,9 @@ public class FakeTaskSource : ITaskSource
 
     public HashSet<long> FailingCourseIds { get; } = new();
 
+    // Makes every call fail, like a bad Canvas token
+    public bool FailEverything { get; set; }
+
     public Assignment AddTodo(long id, long courseId = 1)
     {
         var assignment = new Assignment { Id = id, Name = $"Assignment {id}", CourseCode = $"C{courseId}" };
@@ -28,7 +31,13 @@ public class FakeTaskSource : ITaskSource
     public static void Submit(Assignment assignment) =>
         assignment.Submission = new Submission { WorkflowState = "submitted" };
 
-    public Task<List<Course>> GetCoursesAsync() => Task.FromResult(_courses.ToList());
+    public Task<List<Course>> GetCoursesAsync()
+    {
+        if (FailEverything)
+            throw new HttpRequestException("Canvas returned 401 Unauthorized");
+
+        return Task.FromResult(_courses.ToList());
+    }
 
     public Task<List<Assignment>> GetAssignmentsAsync(Course course)
     {
