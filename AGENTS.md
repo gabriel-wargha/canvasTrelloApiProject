@@ -19,15 +19,10 @@ Run these from inside `CanvasTrelloSync/`:
 ```bash
 dotnet build                     # compile; zero errors before anything else
 dotnet test ../CanvasTrelloSync.Tests   # xUnit suite (fakes, no real APIs)
-dotnet format                    # tidy formatting before a commit
 
 dotnet run -- --dry-run          # interactive menu, every sync is a preview
-dotnet run -- --sync --dry-run   # one preview sync, prints the result, exits
-dotnet run -- --web --dry-run    # dashboard only on localhost:5080 (Ctrl+C to stop)
 dotnet run                       # real sync to my live Trello board
 ```
-
-The menu waits for arrow keys, so you can't drive it. Use `--sync` or `--web` to run and check things yourself. (These flags arrive in Blocks 4 and 5; before that, `--dry-run` prints tables and exits.)
 
 ## Tech stack
 
