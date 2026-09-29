@@ -233,4 +233,45 @@ public class SyncServiceTests : IDisposable
         Assert.Equal(10, _board.Cards.Count);
         Assert.Equal(2, (await _store.LoadAsync()).History.Count);
     }
+
+    [Fact]
+    public async Task SyncAsync_WithProgress_ReportsEachAssignment()
+    {
+        _source.AddTodo(101);
+        _source.AddTodo(102);
+        FakeTaskSource.Submit(_source.AddTodo(103));
+        var reports = new List<(int Done, int Total)>();
+
+        await _sync.SyncAsync(dryRun: true, trigger: "terminal", onProgress: (done, total) => reports.Add((done, total)));
+
+        Assert.Equal(new[] { (0, 3), (1, 3), (2, 3), (3, 3) }, reports);
+    }
+
+    [Fact]
+    public async Task ResetAsync_AfterSync_ForgetsCardsAndHistory()
+    {
+        _source.AddTodo(101);
+        await _sync.SyncAsync(dryRun: false, trigger: "terminal");
+
+        await _sync.ResetAsync();
+
+        var state = await _sync.GetStateAsync();
+        Assert.Empty(state.Cards);
+        Assert.Empty(state.History);
+    }
+
+    [Fact]
+    public async Task LoadCanvasAsync_OneCourseFails_ReturnsOtherCoursesAndFailedName()
+    {
+        _source.AddTodo(101, courseId: 1);
+        _source.AddTodo(201, courseId: 2);
+        _source.FailingCourseIds.Add(1);
+
+        var canvas = await _sync.LoadCanvasAsync();
+
+        var course = Assert.Single(canvas.Courses);
+        Assert.Equal(2, course.Course.Id);
+        Assert.Equal(201, Assert.Single(canvas.AllAssignments).Id);
+        Assert.Equal("C1", Assert.Single(canvas.FailedCourses));
+    }
 }

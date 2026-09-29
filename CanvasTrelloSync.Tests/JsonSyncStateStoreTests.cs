@@ -48,4 +48,23 @@ public class JsonSyncStateStoreTests : IDisposable
         Assert.Equal("web", run.Trigger);
         Assert.Equal((3, 1, 16), (run.Created, run.Moved, run.Skipped));
     }
+
+    [Fact]
+    public async Task ResetAsync_FileExists_DeletesIt()
+    {
+        var store = new JsonSyncStateStore(_statePath);
+        await store.SaveAsync(new SyncState());
+
+        await store.ResetAsync();
+
+        Assert.False(File.Exists(_statePath));
+    }
+
+    [Fact]
+    public async Task ResetAsync_NoFile_DoesNotThrow()
+    {
+        await new JsonSyncStateStore(_statePath).ResetAsync();
+
+        Assert.False(File.Exists(_statePath));
+    }
 }

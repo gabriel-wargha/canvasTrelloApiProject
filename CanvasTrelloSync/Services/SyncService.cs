@@ -23,13 +23,14 @@ public class SyncService
         _store = store;
     }
 
-    // trigger is "terminal" or "web", for the history
-    public async Task<SyncResult> SyncAsync(bool dryRun, string trigger)
+    // trigger is "terminal" or "web", for the history.
+    // onProgress(done, total) is called once Canvas is loaded and after each assignment, for a progress bar.
+    public async Task<SyncResult> SyncAsync(bool dryRun, string trigger, Action<int, int>? onProgress = null)
     {
         await _lock.WaitAsync();
         try
         {
-            return await RunSyncAsync(dryRun, trigger);
+            return await RunSyncAsync(dryRun, trigger, onProgress);
         }
         finally
         {
@@ -37,11 +38,53 @@ public class SyncService
         }
     }
 
-    private async Task<SyncResult> RunSyncAsync(bool dryRun, string trigger)
+    public Task<SyncState> GetStateAsync() => _store.LoadAsync();
+
+    // Locked too, so a reset can't happen in the middle of a sync
+    public async Task ResetAsync()
+    {
+        await _lock.WaitAsync();
+        try
+        {
+            await _store.ResetAsync();
+        }
+        finally
+        {
+            _lock.Release();
+        }
+    }
+
+    public async Task<CanvasSnapshot> LoadCanvasAsync()
+    {
+        var snapshot = new CanvasSnapshot();
+
+        foreach (var course in await _source.GetCoursesAsync())
+        {
+            try
+            {
+                var assignments = await _source.GetAssignmentsAsync(course);
+                snapshot.Courses.Add(new CourseAssignments { Course = course, Assignments = assignments });
+            }
+            catch (HttpRequestException)
+            {
+                // Some Canvas Network courses block assignment access; skip that course and keep going
+                snapshot.FailedCourses.Add(course.CourseCode ?? course.Id.ToString());
+            }
+        }
+
+        return snapshot;
+    }
+
+    private async Task<SyncResult> RunSyncAsync(bool dryRun, string trigger, Action<int, int>? onProgress)
     {
         var result = new SyncResult { DryRun = dryRun };
         var state = await _store.LoadAsync();
-        var assignments = await GetAllAssignmentsAsync(result);
+
+        var canvas = await LoadCanvasAsync();
+        result.FailedCourses.AddRange(canvas.FailedCourses);
+        var assignments = canvas.AllAssignments.ToList();
+        int handled = 0;
+        onProgress?.Invoke(0, assignments.Count);
 
         var lists = await _board.GetListsAsync();
         if (!lists.TryGetValue(LaterList, out string? laterId))
@@ -60,34 +103,36 @@ public class SyncService
                 {
                     // Rule 1: new and not submitted -> new card in Later
                     result.Created.Add(assignment);
-                    if (dryRun)
-                        continue;
-
-                    var created = await _board.CreateCardAsync(laterId, assignment);
-                    state.Cards[assignment.Id] = new SyncedCard
+                    if (!dryRun)
                     {
-                        CardId = created.Id,
-                        CardUrl = created.Url,
-                        SyncedAt = DateTimeOffset.Now,
-                    };
+                        var created = await _board.CreateCardAsync(laterId, assignment);
+                        state.Cards[assignment.Id] = new SyncedCard
+                        {
+                            CardId = created.Id,
+                            CardUrl = created.Url,
+                            SyncedAt = DateTimeOffset.Now,
+                        };
+                    }
                 }
                 else if (card is { Done: false } && assignment.IsSubmitted)
                 {
                     // Rule 2: submitted and its card is still open -> move it to Done
                     result.Moved.Add(assignment);
-                    if (dryRun)
-                        continue;
-
-                    doneId ??= await _board.EnsureListAsync(DoneList);
-                    await _board.MoveCardAsync(card.CardId, doneId);
-                    card.Done = true;
-                    card.SyncedAt = DateTimeOffset.Now;
+                    if (!dryRun)
+                    {
+                        doneId ??= await _board.EnsureListAsync(DoneList);
+                        await _board.MoveCardAsync(card.CardId, doneId);
+                        card.Done = true;
+                        card.SyncedAt = DateTimeOffset.Now;
+                    }
                 }
                 else
                 {
                     // Rule 3: everything else (already has a card, or submitted before it ever got one)
                     result.Skipped++;
                 }
+
+                onProgress?.Invoke(++handled, assignments.Count);
             }
         }
         catch
@@ -115,25 +160,5 @@ public class SyncService
 
         await _store.SaveAsync(state);
         return result;
-    }
-
-    private async Task<List<Assignment>> GetAllAssignmentsAsync(SyncResult result)
-    {
-        var all = new List<Assignment>();
-
-        foreach (var course in await _source.GetCoursesAsync())
-        {
-            try
-            {
-                all.AddRange(await _source.GetAssignmentsAsync(course));
-            }
-            catch (HttpRequestException)
-            {
-                // Some Canvas Network courses block assignment access; skip that course and keep going
-                result.FailedCourses.Add(course.CourseCode ?? course.Id.ToString());
-            }
-        }
-
-        return all;
     }
 }

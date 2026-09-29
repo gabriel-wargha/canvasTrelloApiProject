@@ -17,6 +17,12 @@ public class TrelloClient : ITaskBoard
         _boardId = boardId;
     }
 
+    public async Task<string> GetBoardNameAsync()
+    {
+        var board = await SendAsync<TrelloBoard>(HttpMethod.Get, $"boards/{_boardId}", "fields=name");
+        return board?.Name ?? "?";
+    }
+
     public async Task<Dictionary<string, string>> GetListsAsync()
     {
         var lists = await SendAsync<List<TrelloList>>(HttpMethod.Get, $"boards/{_boardId}/lists", "") ?? new List<TrelloList>();

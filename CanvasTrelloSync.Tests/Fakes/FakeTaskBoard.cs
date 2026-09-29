@@ -16,6 +16,8 @@ public class FakeTaskBoard : ITaskBoard
 
     public List<TrelloCard> CardsIn(string listName) => Cards.Where(c => c.ListId == Lists[listName]).ToList();
 
+    public Task<string> GetBoardNameAsync() => Task.FromResult("Fake board");
+
     public Task<Dictionary<string, string>> GetListsAsync() =>
         Task.FromResult(new Dictionary<string, string>(Lists, StringComparer.OrdinalIgnoreCase));
 

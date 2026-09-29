@@ -7,4 +7,5 @@ public interface ISyncStateStore
 {
     Task<SyncState> LoadAsync();
     Task SaveAsync(SyncState state);
+    Task ResetAsync();                 // forget every card and all history
 }

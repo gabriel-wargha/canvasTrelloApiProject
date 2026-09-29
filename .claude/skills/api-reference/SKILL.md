@@ -34,6 +34,7 @@ This is the single source of truth for how CanvasTrelloSync talks to both APIs. 
 
 | Call | Purpose |
 |---|---|
+| `GET boards/{boardId}?fields=name` | board name for the menu header; also an early check of the key, token and board id |
 | `GET boards/{boardId}/lists` | lists: `id`, `name` |
 | `POST lists?name=Done&idBoard={boardId}&pos=bottom` | create the Done list when missing |
 | `GET lists/{listId}/cards` | cards on a list (board mirror) |

@@ -39,4 +39,11 @@ public class JsonSyncStateStore : ISyncStateStore
         }
         File.Move(tempPath, _path, overwrite: true);
     }
+
+    public Task ResetAsync()
+    {
+        // File.Delete does nothing if the file is already gone
+        File.Delete(_path);
+        return Task.CompletedTask;
+    }
 }
