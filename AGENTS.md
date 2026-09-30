@@ -56,15 +56,6 @@ Canvas and Trello details (endpoints, auth, pagination, gotchas) live in the `ap
   `Canvas:BaseUrl`, `Canvas:Token`, `Trello:ApiKey`, `Trello:ApiToken`, `Trello:BoardId`.
 - The Canvas token goes in the `Authorization` header. The Trello key and token go in the URL query string.
 
-## Sync state
-
-The sync state links each Canvas assignment to its Trello card: `assignment id → { cardId, cardUrl, done, syncedAt }`, plus the last 50 sync runs.
-
-- Blocks 3–7: `CanvasTrelloSync/sync-state.json`
-- Block 8 onward: `CanvasTrelloSync/canvas-trello.db` (SQLite)
-
-A dry run is read-only: it reads Canvas and the state, and writes nothing, not to Trello and not to the state file or database. "Reset sync history" means deleting that state file or database.
-
 ## Code style
 
 - File-scoped namespaces, and one class per file.
