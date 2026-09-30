@@ -118,17 +118,17 @@ The state file maps each `assignment id → { cardId, cardUrl, done, syncedAt }`
 
 ## 3. Course requirements
 
-| Requirement | Where |
-|---|---|
-| Conditionals | sync rules, menu `switch`, secret checks, `--dry-run` flag |
-| Loops | menu `while`, pagination `while`, `foreach` over courses/assignments |
-| Functions | `SyncAsync`, `GetAllPagesAsync`, `CreateCardAsync`, `MoveCardAsync`, … |
-| Classes | clients, services, models, `Menu`, `DashboardServer` |
-| Data structures | `List<Assignment>`, `Dictionary<long, SyncedCard>`, `Dictionary<string,string>` (list name → id) |
-| Stretch: interfaces | `ITaskSource`, `ITaskBoard` |
-| Bonus: files | `JsonSyncStateStore` reads/writes JSON |
-| Bonus: database | `SqliteSyncStateStore`: SQLite with `CREATE TABLE`, `INSERT`, `UPDATE`, `SELECT` |
-| Bonus: tests | `CanvasTrelloSync.Tests` |
+| Requirement         | Where                                                                                            |
+| ------------------- | ------------------------------------------------------------------------------------------------ |
+| Conditionals        | sync rules, menu `switch`, secret checks, `--dry-run` flag                                       |
+| Loops               | menu `while`, pagination `while`, `foreach` over courses/assignments                             |
+| Functions           | `SyncAsync`, `GetAllPagesAsync`, `CreateCardAsync`, `MoveCardAsync`, …                           |
+| Classes             | clients, services, models, `Menu`, `DashboardServer`                                             |
+| Data structures     | `List<Assignment>`, `Dictionary<long, SyncedCard>`, `Dictionary<string,string>` (list name → id) |
+| Stretch: interfaces | `ITaskSource`, `ITaskBoard`                                                                      |
+| Bonus: files        | `JsonSyncStateStore` reads/writes JSON                                                           |
+| Bonus: database     | `SqliteSyncStateStore`: SQLite with `CREATE TABLE`, `INSERT`, `UPDATE`, `SELECT`                 |
+| Bonus: tests        | `CanvasTrelloSync.Tests`                                                                         |
 
 ---
 
@@ -138,6 +138,7 @@ Each block: Claude asks questions first → writes code → builds and tests →
 "Done when" is the check that must pass before the block ends.
 
 ### Block 1 — Foundation + Canvas (1h)
+
 - Add packages: `Spectre.Console`, ASP.NET Core framework reference.
 - Finish models (`TrelloList`, `TrelloCard`), interfaces `ITaskSource` / `ITaskBoard`.
 - `CanvasClient` with Bearer auth, `include[]=submission`, and Link-header pagination.
@@ -146,22 +147,26 @@ Each block: Claude asks questions first → writes code → builds and tests →
 - **Done when:** `dotnet run -- --dry-run` shows my real Canvas Network courses and their assignments with todo/done status.
 
 ### Block 2 — Trello client (1h)
+
 - `TrelloClient`: get lists, **ensure the Done list exists**, create card (returns id + url), move card, get cards on a list.
 - **Done when:** a throwaway test creates a test card in Later, moves it to Done, and deletes it, and I saw each step on the real board.
 
 ### Block 3 — Sync engine + tests (1h)
+
 - `SyncState`, an `ISyncStateStore` interface, and `JsonSyncStateStore` (`sync-state.json`). The interface lets Block 8 swap JSON for SQLite without touching `SyncService`.
 - `SyncService.SyncAsync(dryRun, source)` applying the sync rules, writing history, and locked so the terminal and web never sync at the same time. A dry run writes nothing: no Trello calls that change the board, and no state or history saved.
 - xUnit project with fake source/board. Tests: creates new, skips existing, moves submitted to Done, dry run changes nothing, second sync creates 0, dry run leaves the state file unchanged.
 - **Done when:** `dotnet test` is all green.
 
 ### Block 4 — Beautiful terminal UI (1h)
+
 - Spectre menu (arrow keys), header with FigletText, tables, spinner + progress bar during sync, result panel, history table, reset with confirmation, red error panels (bad token, missing list).
 - When started with `--dry-run`, the header shows a yellow **DRY RUN** badge and "Sync to Trello" only previews.
 - `--sync` flag: skip the menu, run one sync with the same spinner and result panel, then exit (exit code 1 on an API error). This lets Claude check the sync without pressing keys.
 - **Done when:** `dotnet run -- --sync --dry-run` prints the cards it would create or move and exits, and (checked by me) with `--dry-run` every menu item works and looks clean.
 
 ### Block 5 — Web API inside the app (1h)
+
 - `DashboardServer` starts Kestrel on `localhost:5080` in the background, with quiet logs so the menu is not messed up.
 - Endpoints: `GET /api/summary`, `/api/assignments`, `/api/board`, `/api/history`, `POST /api/sync`.
 - Menu "Open web dashboard" starts the server once and opens the browser.
@@ -169,10 +174,12 @@ Each block: Claude asks questions first → writes code → builds and tests →
 - **Done when:** with `dotnet run -- --web --dry-run` running (and, checked by me, with the menu still usable), `curl` on every endpoint returns correct JSON, and `POST /api/sync` adds a "web" row to history.
 
 ### Block 6 — Dashboard page (1h)
+
 - `wwwroot/index.html` + `app.js` + `styles.css` (no build step): progress bars per course, to-do list with Canvas/Trello links, Later/Done board mirror, Sync-now button with spinner, history table, light/dark mode, works on a phone-width window.
 - **Done when:** Claude opens the page in Chrome, clicks Sync now, and a screenshot shows all four sections updated.
 
 ### Block 7 — Real test, polish, README, demo (1h)
+
 - Run the testing checklist against real Canvas Network + Trello (with my OK).
 - Demo two-way sync: submit one real Canvas Network assignment, sync, and watch its card move to Done.
 - `/code-review` and `/simplify` pass; fix findings.
@@ -180,7 +187,9 @@ Each block: Claude asks questions first → writes code → builds and tests →
 - **Done when:** checklist below is all ticked and the README is committed.
 
 ### Block 8 — SQLite database (1h)
+
 Swap the JSON file for a small **SQLite** database: one file (`canvas-trello.db`), with no server to install.
+
 - Add the `Microsoft.Data.Sqlite` package. Use plain SQL, with no ORM, so the SQL stays visible for learning.
 - Two tables:
   ```sql
@@ -208,17 +217,20 @@ Swap the JSON file for a small **SQLite** database: one file (`canvas-trello.db`
 - **Done when:** `dotnet test` is green, a sync writes rows that `sqlite3 canvas-trello.db "SELECT * FROM synced_cards;"` shows, and a second sync still creates 0 cards.
 
 ### Block 9 — Polish: short names, course colors, automatic tests (1h)
+
 - **Short course names:** long Canvas codes like `PD-0141-ENHANCING-LEARNING-COMPUTER-SCIENCE-AND-MATHEMATICS` become `PD-0141` in the terminal, the dashboard and new Trello card titles. One function decides the short name, with tests. (Ask at block start: rename existing cards too, or only new ones?)
 - **Course colors on Trello:** each course gets a colored Trello **label** (created on the board if missing), in the same color order as the dashboard. New cards get their course's label.
 - **Automatic tests on GitHub:** a GitHub Actions workflow (`.github/workflows/tests.yml`) runs `dotnet build` and `dotnet test` on every push, and a green badge appears in the README.
 - **Done when:** the GitHub Actions run is green with its badge in the README, a dry run shows short names, and after a real sync (with my OK) new cards show a short name and a course color label on Trello.
 
 ### Block 10 — Smart extras: finish-date forecast, Mac notifications (1h)
+
 - **Finish-date forecast:** read each submission's `submitted_at` from Canvas and compute my pace per course (assignments per week, last 14 days). The dashboard Overview and the terminal show "At your pace: done around Oct 20", or "Not enough data yet" when there are no recent submissions. The calculation is a plain function with tests (fixed dates, no real clock).
 - **Mac notifications:** after a real sync that created or moved cards, macOS shows a notification ("3 new cards · 1 moved to Done"). Behind a small interface, so tests use a fake; nothing is shown in a dry run or on other systems.
 - **Done when:** `dotnet test` is green, the forecast appears with my real Canvas data, and a real sync that changes something shows a Mac notification.
 
 ### Testing checklist
+
 - [ ] Courses and assignments list correctly
 - [ ] Dry run (menu preview and `--dry-run`) creates nothing in Trello
 - [ ] First sync creates cards; second sync creates **0**
@@ -233,19 +245,18 @@ Swap the JSON file for a small **SQLite** database: one file (`canvas-trello.db`
 
 ## 5. Skills used
 
-| Skill | Where it helps |
-|---|---|
-| `api-reference` (ours, `.claude/skills/`) | every block that calls Canvas or Trello |
-| `mattpocock-skills:tdd` | Block 3: write the sync tests first |
-| `run` | Blocks 1, 4, 5: launch the app and see it working |
-| `claude-in-chrome` | Block 6: open, click, and screenshot the dashboard |
-| `mattpocock-skills:diagnosing-bugs` | whenever something breaks |
-| `code-review`, `simplify` | Block 7 (or end of any block) |
-| `mattpocock-skills:grilling` | before a block, to test the plan with questions |
-| `mattpocock-skills:writing-for-agents` | editing `AGENTS.md` or skills |
+| Skill                                     | Where it helps                                  |
+| ----------------------------------------- | ----------------------------------------------- |
+| `api-reference` (ours, `.claude/skills/`) | every block that calls Canvas or Trello         |
+| `mattpocock-skills:tdd`                   | Block 3: write the sync tests first             |
+| `mattpocock-skills:diagnosing-bugs`       | whenever something breaks                       |
+| `code-review`, `simplify`                 | Block 7 (or end of any block)                   |
+| `mattpocock-skills:grilling`              | before a block, to test the plan with questions |
+| `mattpocock-skills:writing-for-agents`    | editing `AGENTS.md` or skills                   |
 
 ---
 
 ## 6. Optional extras (if time is left)
+
 - Choose which courses to sync
 - Watch mode: auto-sync every X minutes while the dashboard is open

@@ -60,7 +60,6 @@ Canvas and Trello details (endpoints, auth, pagination, gotchas) live in the `ap
 
 - File-scoped namespaces, and one class per file.
 - Async methods end in `Async`, and private fields start with `_`.
-- Short comments that say _why_.
 
 ```csharp
 // Good: clear name, async, checks the response
@@ -77,8 +76,6 @@ public async Task<List<Course>> GetCoursesAsync()
 // Bad:
 public List<Course> Get() => _http.GetFromJsonAsync<List<Course>>("courses").Result!;
 ```
-
-Errors: clients throw `HttpRequestException`. The menu shows it in a red panel, and the dashboard returns `502`.
 
 ## Testing
 
@@ -102,7 +99,7 @@ Errors: clients throw `HttpRequestException`. The menu shows it in a red panel, 
 ## Boundaries
 
 - **Always:** use `--dry-run` while building, and run `dotnet test` before committing.
-- **Ask first:** syncing to my real Trello board (`dotnet run` without `--dry-run`), deleting cards, resetting the sync history, or adding a NuGet package.
+- **Ask first:** syncing to my real Trello board (`dotnet run` without `--dry-run`), deleting cards, resetting the sync history, or adding a package.
 - **Secrets:** refer to secrets by key name only. Keep tokens, keys, `Authorization` headers and full Trello URLs out of output, logs, commits and error messages (log the URL path only). Don't run `dotnet user-secrets list`, because it prints the real values.
 - **Failing tests:** fix the code, never the test. Don't delete, skip, or weaken a failing test (for example by loosening its assert) to make it pass.
 - **When stuck:** if a test still fails after a couple of tries, stop and ask me.
