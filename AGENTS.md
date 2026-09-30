@@ -27,7 +27,6 @@ dotnet run                       # real sync to my live Trello board
 ## Tech stack
 
 - C# 12 / .NET 8 (SDK pinned in `global.json`), `<Nullable>enable</Nullable>`
-- Spectre.Console for the terminal menu
 - ASP.NET Core Minimal API + plain HTML/CSS/JS for the dashboard
 - `HttpClient` + `System.Text.Json` for the Canvas and Trello REST APIs
 - `dotnet user-secrets` for keys and tokens
