@@ -287,14 +287,16 @@ function drawResult(result) {
 
   const created = result.created.length;
   const moved = result.moved.length;
+  const regrouped = result.regrouped.length;
   const main = result.dryRun
-    ? `Preview: would create ${created}, move ${moved}. Nothing changed.`
-    : `Synced: created ${created}, moved ${moved}.`;
+    ? `Preview: would create ${created}, move ${moved}, regroup ${regrouped}. Nothing changed.`
+    : `Synced: created ${created}, moved ${moved}, regrouped ${regrouped}.`;
   box.replaceChildren(el("p", "result-main", main));
 
   const changes = [
     ...result.created.map(a => `New card: ${a.name} (${courseInfo.get(a.course)?.name ?? a.course})`),
     ...result.moved.map(a => `Moved to Done: ${a.name} (${courseInfo.get(a.course)?.name ?? a.course})`),
+    ...result.regrouped.map(a => `Moved to its course list: ${a.name} (${courseInfo.get(a.course)?.name ?? a.course})`),
   ];
   if (changes.length > 0) {
     const details = el("details");

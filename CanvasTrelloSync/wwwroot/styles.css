@@ -281,7 +281,7 @@ main {
 .dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--course); flex: none; }
 
 /* ---------- Board: index cards ---------- */
-.lists { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; }
 .list h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.6rem; }
 .list h3 span { font-family: var(--text); font-weight: 400; color: var(--pencil); }
 .list-cards { display: grid; gap: 0.6rem; padding: 2px 4px 4px 2px; }

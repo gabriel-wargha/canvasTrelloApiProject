@@ -34,7 +34,7 @@ public class SyncServiceTests : IDisposable
         var result = await _sync.SyncAsync(dryRun: false, trigger: "terminal");
 
         Assert.Single(result.Created);
-        var card = Assert.Single(_board.CardsIn("Later"));
+        var card = Assert.Single(_board.CardsIn("Course 1"));
         Assert.Equal("[C1] Assignment 101", card.Name);
 
         var state = await _store.LoadAsync();
@@ -68,7 +68,7 @@ public class SyncServiceTests : IDisposable
 
         Assert.Single(result.Moved);
         Assert.Single(_board.CardsIn("Done"));
-        Assert.Empty(_board.CardsIn("Later"));
+        Assert.Empty(_board.CardsIn("Course 1"));
         Assert.True((await _store.LoadAsync()).Cards[101].Done);
     }
 
@@ -89,15 +89,44 @@ public class SyncServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task SyncAsync_SubmittedWithoutCard_SkipsIt()
+    public async Task SyncAsync_SubmittedWithoutCard_CreatesCardInDone()
     {
         FakeTaskSource.Submit(_source.AddTodo(101));
 
         var result = await _sync.SyncAsync(dryRun: false, trigger: "terminal");
 
-        Assert.Empty(result.Created);
-        Assert.Equal(1, result.Skipped);
+        Assert.Equal(101, Assert.Single(result.Created).Id);
+        Assert.Empty(result.Moved);
+        Assert.Single(_board.CardsIn("Done"));
+        Assert.Empty(_board.CardsIn("Course 1"));
+        Assert.True((await _store.LoadAsync()).Cards[101].Done);
+    }
+
+    [Fact]
+    public async Task SyncAsync_SubmittedWithoutCardSyncedTwice_CreatesItOnce()
+    {
+        FakeTaskSource.Submit(_source.AddTodo(101));
+        await _sync.SyncAsync(dryRun: false, trigger: "terminal");
+
+        var second = await _sync.SyncAsync(dryRun: false, trigger: "terminal");
+
+        Assert.Empty(second.Created);
+        Assert.Empty(second.Moved);
+        Assert.Equal(1, second.Skipped);
+        Assert.Single(_board.Cards);
+    }
+
+    [Fact]
+    public async Task SyncAsync_DryRunSubmittedWithoutCard_ReportsButWritesNothing()
+    {
+        FakeTaskSource.Submit(_source.AddTodo(101));
+
+        var result = await _sync.SyncAsync(dryRun: true, trigger: "terminal");
+
+        Assert.Equal(101, Assert.Single(result.Created).Id);
         Assert.Empty(_board.Cards);
+        Assert.False(_board.Lists.ContainsKey("Done"));
+        Assert.Equal(0, _board.WriteCalls);
     }
 
     [Fact]
@@ -114,12 +143,118 @@ public class SyncServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task SyncAsync_LaterListMissing_Throws()
+    public async Task SyncAsync_SharedLaterListMissing_StillSyncs()
     {
         _board.Lists.Remove("Later");
         _source.AddTodo(101);
 
-        await Assert.ThrowsAsync<InvalidOperationException>(() => _sync.SyncAsync(dryRun: false, trigger: "terminal"));
+        var result = await _sync.SyncAsync(dryRun: false, trigger: "terminal");
+
+        Assert.Single(result.Created);
+        Assert.Single(_board.CardsIn("Course 1"));
+    }
+
+    [Fact]
+    public async Task SyncAsync_TwoCourses_PutsEachCardInItsCourseList()
+    {
+        _source.AddTodo(101, courseId: 1);
+        _source.AddTodo(102, courseId: 1);
+        _source.AddTodo(201, courseId: 2);
+
+        await _sync.SyncAsync(dryRun: false, trigger: "terminal");
+
+        Assert.Equal(2, _board.CardsIn("Course 1").Count);
+        Assert.Equal("card-201", Assert.Single(_board.CardsIn("Course 2")).Id);
+        Assert.Empty(_board.CardsIn("Later"));
+    }
+
+    [Fact]
+    public async Task SyncAsync_CourseListAlreadyExists_ReusesIt()
+    {
+        _board.Lists["Course 1"] = "list-existing";
+        _source.AddTodo(101);
+
+        await _sync.SyncAsync(dryRun: false, trigger: "terminal");
+
+        Assert.Equal("list-existing", Assert.Single(_board.Cards).ListId);
+    }
+
+    [Fact]
+    public async Task SyncAsync_DryRun_CreatesNoCourseList()
+    {
+        _source.AddTodo(101);
+
+        await _sync.SyncAsync(dryRun: true, trigger: "terminal");
+
+        Assert.False(_board.Lists.ContainsKey("Course 1"));
+        Assert.Equal(0, _board.WriteCalls);
+    }
+
+    [Fact]
+    public async Task SyncAsync_OldCardInSharedLater_MovesItToCourseList()
+    {
+        // A card made before course lists existed: open, and sitting in the shared "Later" list
+        _source.AddTodo(101);
+        var oldCard = _board.AddCard("Later", 101);
+        await SaveOpenCardAsync(101, oldCard);
+
+        var result = await _sync.SyncAsync(dryRun: false, trigger: "terminal");
+
+        Assert.Equal(101, Assert.Single(result.Regrouped).Id);
+        Assert.Empty(result.Created);
+        Assert.Equal(0, result.Skipped);
+        Assert.Empty(_board.CardsIn("Later"));
+        Assert.Single(_board.CardsIn("Course 1"));
+    }
+
+    [Fact]
+    public async Task SyncAsync_OldCardRegrouped_NextSyncSkipsIt()
+    {
+        _source.AddTodo(101);
+        await SaveOpenCardAsync(101, _board.AddCard("Later", 101));
+        await _sync.SyncAsync(dryRun: false, trigger: "terminal");
+        int writesBefore = _board.WriteCalls;
+
+        var second = await _sync.SyncAsync(dryRun: false, trigger: "terminal");
+
+        Assert.Empty(second.Regrouped);
+        Assert.Equal(1, second.Skipped);
+        Assert.Equal(writesBefore, _board.WriteCalls);
+    }
+
+    [Fact]
+    public async Task SyncAsync_DryRunWithOldCard_ReportsRegroupButMovesNothing()
+    {
+        _source.AddTodo(101);
+        await SaveOpenCardAsync(101, _board.AddCard("Later", 101));
+
+        var result = await _sync.SyncAsync(dryRun: true, trigger: "terminal");
+
+        Assert.Single(result.Regrouped);
+        Assert.Single(_board.CardsIn("Later"));
+        Assert.Equal(0, _board.WriteCalls);
+    }
+
+    [Fact]
+    public async Task SyncAsync_OldCardSubmitted_MovesItToDoneNotCourseList()
+    {
+        var assignment = _source.AddTodo(101);
+        await SaveOpenCardAsync(101, _board.AddCard("Later", 101));
+        FakeTaskSource.Submit(assignment);
+
+        var result = await _sync.SyncAsync(dryRun: false, trigger: "terminal");
+
+        Assert.Single(result.Moved);
+        Assert.Empty(result.Regrouped);
+        Assert.Single(_board.CardsIn("Done"));
+        Assert.False(_board.Lists.ContainsKey("Course 1"));
+    }
+
+    private async Task SaveOpenCardAsync(long assignmentId, TrelloCard card)
+    {
+        var state = await _store.LoadAsync();
+        state.Cards[assignmentId] = new SyncedCard { CardId = card.Id, CardUrl = card.Url, SyncedAt = DateTimeOffset.Now };
+        await _store.SaveAsync(state);
     }
 
     [Fact]
@@ -173,10 +308,11 @@ public class SyncServiceTests : IDisposable
         await _sync.SyncAsync(dryRun: false, trigger: "web");
 
         var run = Assert.Single((await _store.LoadAsync()).History);
+        // 101 gets a card in its course list, and 102 (already submitted) gets a card straight in Done
         Assert.Equal("web", run.Trigger);
-        Assert.Equal(1, run.Created);
+        Assert.Equal(2, run.Created);
         Assert.Equal(0, run.Moved);
-        Assert.Equal(1, run.Skipped);
+        Assert.Equal(0, run.Skipped);
     }
 
     [Fact]

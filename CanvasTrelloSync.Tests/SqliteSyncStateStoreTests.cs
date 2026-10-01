@@ -101,7 +101,7 @@ public class SqliteSyncStateStoreTests : SyncStateStoreTests, IDisposable
         var second = await sync.SyncAsync(dryRun: false, trigger: "web");
 
         Assert.Empty(second.Created);
-        Assert.Equal(2, board.CardsIn("Later").Count);
+        Assert.Equal(2, board.CardsIn("Course 1").Count);
         Assert.Equal(2, (await sync.GetStateAsync()).History.Count);
     }
 }

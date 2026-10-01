@@ -14,6 +14,7 @@ public class Assignment
     [JsonPropertyName("submission")] public Submission? Submission { get; set; }
 
     public string? CourseCode { get; set; }
+    public string? CourseName { get; set; }
 
     public bool IsSubmitted => Submission?.WorkflowState is "submitted" or "graded" or "pending_review";
     public string CardTitle => $"[{CourseCode}] {Name}";

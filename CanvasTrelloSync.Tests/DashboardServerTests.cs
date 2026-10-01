@@ -74,7 +74,7 @@ public class DashboardServerTests : IAsyncLifetime
         var json = await client.GetFromJsonAsync<JsonElement>("/api/assignments");
 
         var byId = json.EnumerateArray().ToDictionary(a => a.GetProperty("id").GetInt64());
-        Assert.Equal("Later", byId[101].GetProperty("card").GetString());
+        Assert.Equal("Course 1", byId[101].GetProperty("card").GetString());
         Assert.Equal("https://trello.test/c/101", byId[101].GetProperty("cardUrl").GetString());
         Assert.True(byId[102].GetProperty("submitted").GetBoolean());
         Assert.Equal(JsonValueKind.Null, byId[102].GetProperty("card").ValueKind);
@@ -90,11 +90,27 @@ public class DashboardServerTests : IAsyncLifetime
         var json = await client.GetFromJsonAsync<JsonElement>("/api/board");
 
         var lists = json.GetProperty("lists");
-        Assert.Equal("Later", lists[0].GetProperty("name").GetString());
+        Assert.Equal(2, lists.GetArrayLength());
+        Assert.Equal("Course 1", lists[0].GetProperty("name").GetString());
         Assert.Equal(1, lists[0].GetProperty("cards").GetArrayLength());
         Assert.Equal("Done", lists[1].GetProperty("name").GetString());
         Assert.Equal(0, lists[1].GetProperty("cards").GetArrayLength());
         Assert.False(_board.Lists.ContainsKey("Done"));
+    }
+
+    [Fact]
+    public async Task GetBoard_TwoCoursesAndOldCards_ShowsCourseListsSharedLaterThenDone()
+    {
+        _source.AddTodo(101, courseId: 1);
+        _source.AddTodo(201, courseId: 2);
+        _board.AddCard("Later", 999);
+        await _sync.SyncAsync(dryRun: false, trigger: "terminal");
+        var client = await StartServerAsync();
+
+        var json = await client.GetFromJsonAsync<JsonElement>("/api/board");
+
+        var names = json.GetProperty("lists").EnumerateArray().Select(l => l.GetProperty("name").GetString());
+        Assert.Equal(new[] { "Course 1", "Course 2", "Later", "Done" }, names);
     }
 
     [Fact]

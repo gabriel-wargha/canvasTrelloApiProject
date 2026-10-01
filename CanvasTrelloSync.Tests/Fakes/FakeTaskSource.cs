@@ -16,11 +16,11 @@ public class FakeTaskSource : ITaskSource
 
     public Assignment AddTodo(long id, long courseId = 1)
     {
-        var assignment = new Assignment { Id = id, Name = $"Assignment {id}", CourseCode = $"C{courseId}" };
+        var assignment = new Assignment { Id = id, Name = $"Assignment {id}", CourseCode = $"C{courseId}", CourseName = $"Course {courseId}" };
 
         if (!_assignments.ContainsKey(courseId))
         {
-            _courses.Add(new Course { Id = courseId, CourseCode = $"C{courseId}" });
+            _courses.Add(new Course { Id = courseId, CourseCode = $"C{courseId}", Name = $"Course {courseId}" });
             _assignments[courseId] = new List<Assignment>();
         }
 

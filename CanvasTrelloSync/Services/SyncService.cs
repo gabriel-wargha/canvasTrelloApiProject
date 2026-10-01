@@ -6,7 +6,7 @@ namespace CanvasTrelloSync.Services;
 // The sync engine: compares Canvas with what we remember, then creates or moves Trello cards.
 public class SyncService
 {
-    public const string LaterList = "Later";
+    public const string LaterList = "Later";   // the old shared list; new cards go to a list per course (CourseLists)
     public const string DoneList = "Done";
 
     private readonly ITaskSource _source;
@@ -39,6 +39,8 @@ public class SyncService
     }
 
     public Task<SyncState> GetStateAsync() => _store.LoadAsync();
+
+    public Task<List<Course>> GetCoursesAsync() => _source.GetCoursesAsync();
 
     // Locked too, so a reset can't happen in the middle of a sync
     public async Task ResetAsync()
@@ -86,12 +88,24 @@ public class SyncService
         int handled = 0;
         onProgress?.Invoke(0, assignments.Count);
 
+        // Cards still in the old shared "Later" list (made before each course had its own list).
+        // Only reading here, so this is safe in a dry run too.
         var lists = await _board.GetListsAsync();
-        if (!lists.TryGetValue(LaterList, out string? laterId))
-            throw new InvalidOperationException($"The Trello board has no list named \"{LaterList}\".");
+        var oldLaterCardIds = lists.TryGetValue(LaterList, out string? oldLaterId)
+            ? (await _board.GetCardsAsync(oldLaterId)).Select(c => c.Id).ToHashSet()
+            : new HashSet<string>();
 
-        // Found only when the first card needs to move, and never in a dry run (EnsureListAsync may create the list)
+        // Found only when the first card needs them, and never in a dry run (EnsureListAsync may create the list)
         string? doneId = null;
+        var courseListIds = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);   // list name -> list id
+
+        async Task<string> CourseListIdAsync(Assignment assignment)
+        {
+            string name = CourseLists.ListName(assignment.CourseName, assignment.CourseCode);
+            if (!courseListIds.TryGetValue(name, out string? id))
+                courseListIds[name] = id = await _board.EnsureListAsync(name);
+            return id;
+        }
 
         try
         {
@@ -99,17 +113,21 @@ public class SyncService
             {
                 bool hasCard = state.Cards.TryGetValue(assignment.Id, out SyncedCard? card);
 
-                if (!hasCard && !assignment.IsSubmitted)
+                if (!hasCard)
                 {
-                    // Rule 1: new and not submitted -> new card in Later
+                    // Rule 1: no card yet -> new card in its course's Later list, or straight in Done if it was already submitted
                     result.Created.Add(assignment);
                     if (!dryRun)
                     {
-                        var created = await _board.CreateCardAsync(laterId, assignment);
+                        string listId = assignment.IsSubmitted
+                            ? doneId ??= await _board.EnsureListAsync(DoneList)
+                            : await CourseListIdAsync(assignment);
+                        var created = await _board.CreateCardAsync(listId, assignment);
                         state.Cards[assignment.Id] = new SyncedCard
                         {
                             CardId = created.Id,
                             CardUrl = created.Url,
+                            Done = assignment.IsSubmitted,
                             SyncedAt = DateTimeOffset.Now,
                         };
                     }
@@ -126,9 +144,19 @@ public class SyncService
                         card.SyncedAt = DateTimeOffset.Now;
                     }
                 }
+                else if (card is { Done: false } && oldLaterCardIds.Contains(card.CardId))
+                {
+                    // Rule 3: still to do, but its card is in the old shared Later list -> move it to its course list
+                    result.Regrouped.Add(assignment);
+                    if (!dryRun)
+                    {
+                        await _board.MoveCardAsync(card.CardId, await CourseListIdAsync(assignment));
+                        card.SyncedAt = DateTimeOffset.Now;
+                    }
+                }
                 else
                 {
-                    // Rule 3: everything else (already has a card, or submitted before it ever got one)
+                    // Rule 4: everything else (its card is already in the right list)
                     result.Skipped++;
                 }
 

@@ -14,7 +14,17 @@ public class FakeTaskBoard : ITaskBoard
     public int? FailOnCreateNumber { get; set; }
     private int _createCount;
 
-    public List<TrelloCard> CardsIn(string listName) => Cards.Where(c => c.ListId == Lists[listName]).ToList();
+    // A list that was never created simply has no cards
+    public List<TrelloCard> CardsIn(string listName) =>
+        Lists.TryGetValue(listName, out string? listId) ? Cards.Where(c => c.ListId == listId).ToList() : new List<TrelloCard>();
+
+    // Puts a card on the board directly, like one made by an older version of the app
+    public TrelloCard AddCard(string listName, long assignmentId)
+    {
+        var card = new TrelloCard { Id = $"card-{assignmentId}", ListId = Lists[listName], Url = $"https://trello.test/c/{assignmentId}" };
+        Cards.Add(card);
+        return card;
+    }
 
     public Task<string> GetBoardNameAsync() => Task.FromResult("Fake board");
 

@@ -1,6 +1,8 @@
+using System.Globalization;
 using System.Net.Http.Json;
 using CanvasTrelloSync.Interfaces;
 using CanvasTrelloSync.Models;
+using CanvasTrelloSync.Services;
 
 namespace CanvasTrelloSync.Clients;
 
@@ -25,11 +27,9 @@ public class TrelloClient : ITaskBoard
 
     public async Task<Dictionary<string, string>> GetListsAsync()
     {
-        var lists = await SendAsync<List<TrelloList>>(HttpMethod.Get, $"boards/{_boardId}/lists", "") ?? new List<TrelloList>();
-
         // Case-insensitive, so "done" and "Done" count as the same list
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var list in lists)
+        foreach (var list in await GetBoardListsAsync())
             result.TryAdd(list.Name, list.Id);
 
         return result;
@@ -37,14 +37,31 @@ public class TrelloClient : ITaskBoard
 
     public async Task<string> EnsureListAsync(string name)
     {
-        var lists = await GetListsAsync();
-        if (lists.TryGetValue(name, out string? id))
-            return id;
+        var lists = await GetBoardListsAsync();
+        var existing = lists.FirstOrDefault(l => string.Equals(l.Name, name, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null)
+            return existing.Id;
 
         var created = await SendAsync<TrelloList>(HttpMethod.Post, "lists",
-            $"name={Uri.EscapeDataString(name)}&idBoard={_boardId}&pos=bottom");
+            $"name={Uri.EscapeDataString(name)}&idBoard={_boardId}&pos={NewListPosition(lists, name)}");
         return created!.Id;
     }
+
+    // New course lists go just before Done, so Done stays the last column. Done itself (or any list when
+    // there is no Done yet) goes at the end.
+    private static string NewListPosition(List<TrelloList> lists, string name)
+    {
+        var done = lists.FirstOrDefault(l => string.Equals(l.Name, SyncService.DoneList, StringComparison.OrdinalIgnoreCase));
+        if (done is null || string.Equals(name, SyncService.DoneList, StringComparison.OrdinalIgnoreCase))
+            return "bottom";
+
+        // Halfway between Done and the list before it
+        double before = lists.Where(l => l.Pos < done.Pos).Select(l => l.Pos).DefaultIfEmpty(0).Max();
+        return ((before + done.Pos) / 2).ToString(CultureInfo.InvariantCulture);
+    }
+
+    private async Task<List<TrelloList>> GetBoardListsAsync() =>
+        await SendAsync<List<TrelloList>>(HttpMethod.Get, $"boards/{_boardId}/lists", "fields=name,pos") ?? new List<TrelloList>();
 
     public async Task<List<TrelloCard>> GetCardsAsync(string listId) =>
         await SendAsync<List<TrelloCard>>(HttpMethod.Get, $"lists/{listId}/cards", "") ?? new List<TrelloCard>();

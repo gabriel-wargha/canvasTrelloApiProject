@@ -140,7 +140,7 @@ public class DashboardServer : IAsyncDisposable
                     course = a.CourseCode,
                     canvasUrl = a.Url,
                     submitted = a.IsSubmitted,
-                    card = card is null ? null : card.Done ? SyncService.DoneList : SyncService.LaterList,
+                    card = card is null ? null : card.Done ? SyncService.DoneList : CourseLists.ListName(a.CourseName, a.CourseCode),
                     cardUrl = card?.CardUrl,
                 };
             });
@@ -154,11 +154,25 @@ public class DashboardServer : IAsyncDisposable
         var lists = await _board.GetListsAsync();
         var result = new List<object>();
 
-        foreach (string name in new[] { SyncService.LaterList, SyncService.DoneList })
+        // One column per course, then the old shared Later (only while old cards are still in it), then Done
+        // A course list is a list named after one of my current courses
+        var names = (await _sync.GetCoursesAsync())
+            .Select(c => CourseLists.ListName(c.Name, c.CourseCode))
+            .Where(lists.ContainsKey)
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        names.Add(SyncService.LaterList);
+        names.Add(SyncService.DoneList);
+
+        foreach (string name in names)
         {
             var cards = lists.TryGetValue(name, out string? listId)
                 ? await _board.GetCardsAsync(listId)
                 : new List<TrelloCard>();
+
+            if (name == SyncService.LaterList && cards.Count == 0)
+                continue;
 
             result.Add(new
             {
@@ -193,6 +207,7 @@ public class DashboardServer : IAsyncDisposable
             dryRun = result.DryRun,
             created = result.Created.Select(a => new { id = a.Id, name = a.Name, course = a.CourseCode }),
             moved = result.Moved.Select(a => new { id = a.Id, name = a.Name, course = a.CourseCode }),
+            regrouped = result.Regrouped.Select(a => new { id = a.Id, name = a.Name, course = a.CourseCode }),
             skipped = result.Skipped,
             failedCourses = result.FailedCourses,
         });

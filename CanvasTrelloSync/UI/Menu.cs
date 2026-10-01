@@ -203,7 +203,7 @@ public class Menu
         {
             string card = !state.Cards.TryGetValue(a.Id, out var synced) ? "[grey]—[/]"
                 : synced.Done ? "[green]Done[/]"
-                : "[blue]Later[/]";
+                : $"[blue]{Markup.Escape(CourseLists.ListName(a.CourseName, a.CourseCode))}[/]";
 
             table.AddRow(
                 a.IsSubmitted ? "[green]✅ done[/]" : "[yellow]⏳ todo[/]",
@@ -247,14 +247,16 @@ public class Menu
     {
         string created = result.DryRun ? "Would create" : "Created";
         string moved = result.DryRun ? "Would move to Done" : "Moved to Done";
+        string regrouped = result.DryRun ? "Would regroup" : "Regrouped";
 
         AnsiConsole.Write(new Panel(
-                $"✨ {created} [bold]{result.Created.Count}[/]   ➜ {moved} [bold]{result.Moved.Count}[/]   ⏭ Skipped [bold]{result.Skipped}[/]")
+                $"✨ {created} [bold]{result.Created.Count}[/]   ➜ {moved} [bold]{result.Moved.Count}[/]   " +
+                $"📂 {regrouped} [bold]{result.Regrouped.Count}[/]   ⏭ Skipped [bold]{result.Skipped}[/]")
             .Header(result.DryRun ? "Result (dry run)" : "Result")
             .Border(BoxBorder.Rounded)
             .BorderColor(result.DryRun ? Color.Yellow : Color.Green));
 
-        if (result.Created.Count + result.Moved.Count > 0)
+        if (result.Created.Count + result.Moved.Count + result.Regrouped.Count > 0)
         {
             var table = new Table().Border(TableBorder.Rounded);
             table.AddColumn("Card");
@@ -262,9 +264,11 @@ public class Menu
             table.AddColumn("Assignment");
 
             foreach (var a in result.Created)
-                table.AddRow("[blue]✨ new in Later[/]", Markup.Escape(a.CourseCode ?? "?"), Markup.Escape(a.Name ?? "(no name)"));
+                table.AddRow($"[blue]✨ new in {Markup.Escape(a.IsSubmitted ? SyncService.DoneList : CourseLists.ListName(a.CourseName, a.CourseCode))}[/]", Markup.Escape(a.CourseCode ?? "?"), Markup.Escape(a.Name ?? "(no name)"));
             foreach (var a in result.Moved)
                 table.AddRow("[green]➜ to Done[/]", Markup.Escape(a.CourseCode ?? "?"), Markup.Escape(a.Name ?? "(no name)"));
+            foreach (var a in result.Regrouped)
+                table.AddRow($"[blue]📂 to {Markup.Escape(CourseLists.ListName(a.CourseName, a.CourseCode))}[/]", Markup.Escape(a.CourseCode ?? "?"), Markup.Escape(a.Name ?? "(no name)"));
 
             AnsiConsole.Write(table);
         }

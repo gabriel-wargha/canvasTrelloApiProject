@@ -26,7 +26,10 @@ public class CanvasClient : ITaskSource
             $"courses/{course.Id}/assignments?include[]=submission&per_page=50");
 
         foreach (var assignment in assignments)
+        {
             assignment.CourseCode = course.CourseCode ?? course.Id.ToString();
+            assignment.CourseName = course.Name;
+        }
 
         return assignments;
     }
