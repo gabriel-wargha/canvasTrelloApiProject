@@ -5,6 +5,7 @@ using CanvasTrelloSync.Interfaces;
 using CanvasTrelloSync.Models;
 using CanvasTrelloSync.Services;
 using CanvasTrelloSync.Web;
+using Microsoft.Data.Sqlite;
 using Spectre.Console;
 
 namespace CanvasTrelloSync.UI;
@@ -146,10 +147,10 @@ public class Menu
             var lastRun = (await _sync.GetStateAsync()).History.LastOrDefault();
             lastSync = lastRun is null ? "never" : lastRun.RanAt.ToLocalTime().ToString("MMM d, HH:mm");
         }
-        catch (JsonException)
+        catch (Exception ex) when (ex is JsonException or SqliteException)
         {
             // Keep the menu usable so "Reset sync history" can fix it
-            lastSync = "[red]sync-state.json is damaged[/]";
+            lastSync = "[red]the sync history can't be read[/]";
         }
 
         AnsiConsole.MarkupLine(
@@ -157,7 +158,7 @@ public class Menu
         if (_dashboard.IsRunning)
             AnsiConsole.MarkupLine($"[grey]Dashboard:[/] [link]{_dashboard.Url}[/]");
         if (_dryRun)
-            AnsiConsole.MarkupLine("[black on yellow] DRY RUN [/] [yellow]Every sync is a preview: nothing changes on Trello or in sync-state.json.[/]");
+            AnsiConsole.MarkupLine("[black on yellow] DRY RUN [/] [yellow]Every sync is a preview: nothing changes on Trello or in the sync history.[/]");
         AnsiConsole.WriteLine();
     }
 
@@ -318,7 +319,7 @@ public class Menu
         // A dry-run session must never change the sync state
         if (_dryRun)
         {
-            AnsiConsole.MarkupLine("[yellow]Reset is turned off in dry-run mode, because a dry run never changes sync-state.json.[/]");
+            AnsiConsole.MarkupLine("[yellow]Reset is turned off in dry-run mode, because a dry run never changes the sync history.[/]");
             return;
         }
 
@@ -345,7 +346,7 @@ public class Menu
 
     // Problems we expect and can explain; anything else is a real bug and should crash loudly
     private static bool IsExpected(Exception ex) =>
-        ex is HttpRequestException or InvalidOperationException or JsonException or IOException;
+        ex is HttpRequestException or InvalidOperationException or JsonException or SqliteException or IOException;
 
     private static void ShowError(Exception ex)
     {
@@ -358,6 +359,7 @@ public class Menu
             HttpRequestException { StatusCode: null } =>
                 "Could not reach the server. Check your internet connection.",
             JsonException => "sync-state.json is damaged. Fix or delete it (Reset sync history).",
+            SqliteException => "canvas-trello.db can't be read. Close other programs using it, or delete it (cards would be created again).",
             _ => "",
         };
 

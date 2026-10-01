@@ -25,10 +25,28 @@ if (missing.Count > 0)
     return 1;
 }
 
-// 4. Build the app's parts. sync-state.json lives in the folder you run from (CanvasTrelloSync/)
+// 4. Build the app's parts. The database lives in the folder you run from (CanvasTrelloSync/)
 var source = new CanvasClient(config["Canvas:BaseUrl"]!, config["Canvas:Token"]!);
 var board = new TrelloClient(config["Trello:ApiKey"]!, config["Trello:ApiToken"]!, config["Trello:BoardId"]!);
-var store = new JsonSyncStateStore("sync-state.json");
+
+const string dbPath = "canvas-trello.db";
+const string jsonPath = "sync-state.json";
+ISyncStateStore store;
+if (dryRun && !File.Exists(dbPath))
+{
+    // A dry run writes nothing, not even a new database file, so it keeps reading the old JSON state
+    store = new JsonSyncStateStore(jsonPath);
+}
+else
+{
+    var sqliteStore = new SqliteSyncStateStore($"Data Source={dbPath}");
+    // First real run: copy the old JSON state in once, so no card is created twice
+    if (!dryRun && await sqliteStore.ImportJsonAsync(jsonPath))
+        AnsiConsole.MarkupLine($"[green]Imported {jsonPath} into {dbPath} (old file kept as sync-state.imported.json).[/]");
+    store = sqliteStore;
+}
+using var storeLifetime = store as IDisposable;
+
 var sync = new SyncService(source, board, store);
 await using var dashboard = new DashboardServer(sync, board, dryRun);
 
@@ -37,7 +55,7 @@ if (webOnly)
 {
     AnsiConsole.Write(new Rule("[bold dodgerblue1]CanvasTrelloSync dashboard[/]").LeftJustified());
     if (dryRun)
-        AnsiConsole.MarkupLine("[black on yellow] DRY RUN [/] [yellow]Sync now is a preview: nothing changes on Trello or in sync-state.json.[/]");
+        AnsiConsole.MarkupLine("[black on yellow] DRY RUN [/] [yellow]Sync now is a preview: nothing changes on Trello or in the sync history.[/]");
     AnsiConsole.MarkupLine($"Running at [link]{DashboardServer.DefaultUrl}[/]. Press [bold]Ctrl+C[/] to stop.");
 
     try
