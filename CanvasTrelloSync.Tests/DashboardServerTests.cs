@@ -132,6 +132,20 @@ public class DashboardServerTests : IAsyncLifetime
         Assert.Equal(JsonValueKind.Null, lists[1].GetProperty("next").ValueKind);   // Done has no next activity
     }
 
+    [Theory]
+    [InlineData("/")]
+    [InlineData("/app.js")]
+    [InlineData("/styles.css")]
+    public async Task GetPageFile_Always_TellsBrowserToCheckForNewVersion(string path)
+    {
+        var client = await StartServerAsync();
+
+        using var response = await client.GetAsync(path);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.True(response.Headers.CacheControl?.NoCache);
+    }
+
     [Fact]
     public async Task GetHistory_TwoRuns_ReturnsNewestFirst()
     {

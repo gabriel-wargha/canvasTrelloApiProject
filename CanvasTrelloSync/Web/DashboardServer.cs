@@ -68,7 +68,11 @@ public class DashboardServer : IAsyncDisposable
 
     private WebApplication BuildApp(bool handleCtrlC)
     {
-        var builder = WebApplication.CreateBuilder();
+        // The page files are copied next to the app when it builds, so they're found from any folder (and in tests)
+        var builder = WebApplication.CreateBuilder(new WebApplicationOptions
+        {
+            WebRootPath = Path.Combine(AppContext.BaseDirectory, "wwwroot"),
+        });
         builder.WebHost.UseUrls(_listenUrl);
 
         // No logs at all: they would print over the terminal menu
@@ -83,7 +87,12 @@ public class DashboardServer : IAsyncDisposable
         var app = builder.Build();
         app.Use(HandleErrorsAsync);
         app.UseDefaultFiles();
-        app.UseStaticFiles();
+        app.UseStaticFiles(new StaticFileOptions
+        {
+            // "no-cache" = the browser may keep a copy, but must ask first whether it changed,
+            // so a new app.js shows up on a normal reload
+            OnPrepareResponse = ctx => ctx.Context.Response.Headers.CacheControl = "no-cache",
+        });
 
         app.MapGet("/api/summary", GetSummaryAsync);
         app.MapGet("/api/assignments", GetAssignmentsAsync);
