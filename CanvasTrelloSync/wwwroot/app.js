@@ -150,45 +150,6 @@ function drawSummary(data) {
   box.replaceChildren(grid);
 }
 
-function drawTodo(assignments) {
-  const todo = assignments.filter(a => !a.submitted);
-  document.getElementById("todo-count").textContent = String(todo.length);
-
-  const box = document.getElementById("todo");
-  if (todo.length === 0) {
-    box.replaceChildren(el("p", "quiet", "Nothing left. Every assignment is submitted."));
-    return;
-  }
-
-  // Grouped by course, so each course name shows once instead of on every line
-  const groups = new Map();
-  for (const a of todo) {
-    if (!groups.has(a.course)) groups.set(a.course, []);
-    groups.get(a.course).push(a);
-  }
-
-  const wrap = el("div", "todo-groups");
-  for (const [course, items] of groups) {
-    const heading = el("h3", "todo-course");
-    heading.append(courseTag(course));
-
-    const list = el("ul", "todo-list");
-    for (const a of items) {
-      // The whole row is one link to the assignment on Canvas
-      const row = link(a.canvasUrl, null, "todo-row");
-      row.append(el("span", "box"), el("span", "todo-name", a.name), el("span", "todo-go", "Canvas ↗"));
-
-      const item = el("li");
-      item.append(row);
-      if (a.cardUrl) item.append(link(a.cardUrl, "Trello ↗", "todo-trello"));
-      list.append(item);
-    }
-
-    wrap.append(heading, list);
-  }
-  box.replaceChildren(wrap);
-}
-
 // The Next tab: one card per course with the assignment to do next and its points
 function drawNext(items) {
   const box = document.getElementById("next");
@@ -223,48 +184,6 @@ function drawNext(items) {
   box.replaceChildren(grid);
 }
 
-function drawBoard(board) {
-  const lists = el("div", "lists");
-
-  for (const list of board.lists) {
-    const column = el("div", `list ${list.name.toLowerCase()}`);
-    const title = el("h3", null, `${list.name} `);
-    title.append(el("span", null, `(${list.cards.length})`));
-
-    const cards = el("div", "list-cards");
-
-    // The recommended next activity goes first. Its own card is taken out of the rest, so it shows once.
-    let rest = list.cards;
-    if (list.next) {
-      const nextCard = list.cards.find(c => c.id === list.next.cardId);
-      rest = list.cards.filter(c => c !== nextCard);
-
-      const next = link(nextCard?.url ?? list.next.canvasUrl, null, "index-card next");
-      next.append(el("span", "next-label", "⭐ Next up"), el("span", null, list.next.name));
-      const course = /^\[(.+?)\]/.exec(nextCard?.name ?? "");
-      if (course) next.style.setProperty("--course", colorFor(course[1]));
-      cards.append(next);
-    }
-
-    if (list.cards.length === 0 && !list.next) {
-      cards.append(el("p", "empty-list", "Empty"));
-    } else {
-      for (const card of rest) {
-        // Our cards are named "[COURSE] Assignment": show the name, and use the course for the color
-        const match = /^\[(.+?)\]\s*(.*)$/.exec(card.name);
-        const node = link(card.url, match ? match[2] : card.name, "index-card");
-        if (match) node.style.setProperty("--course", colorFor(match[1]));
-        cards.append(node);
-      }
-    }
-
-    column.append(title, cards);
-    lists.append(column);
-  }
-
-  document.getElementById("board").replaceChildren(lists);
-}
-
 function drawHistory(history) {
   const box = document.getElementById("history");
   if (history.length === 0) {
@@ -287,13 +206,11 @@ function drawHistory(history) {
   box.replaceChildren(list);
 }
 
-// Starts all four requests at once. The to-do list and the board wait for the summary,
-// because they use its course names and colors. One failing section shows its own error.
+// Starts all three requests at once. The Next tab waits for the summary,
+// because it uses its course names and colors. One failing section shows its own error.
 async function loadAll() {
   const summaryRequest = api("/api/summary");
   const requests = {
-    assignments: api("/api/assignments"),
-    board: api("/api/board"),
     next: api("/api/next"),
     history: api("/api/history"),
   };
@@ -307,8 +224,6 @@ async function loadAll() {
   }
 
   await Promise.all([
-    requests.assignments.then(drawTodo, error => showError("todo", "your assignments", error)),
-    requests.board.then(drawBoard, error => showError("board", "the Trello board", error)),
     requests.next.then(drawNext, error => showError("next", "what to do next", error)),
     requests.history.then(drawHistory, error => showError("history", "the sync log", error)),
   ]);
@@ -382,7 +297,7 @@ async function syncNow() {
     drawResult(await api("/api/sync", { method: "POST" }));
 
     // Reloading reads Canvas again and takes a few seconds: fade the sections and say so,
-    // so the old board (and its old Next up star) doesn't look final
+    // so the old Next tab doesn't look final
     const updating = el("p", "updating-note", "Updating the page…");
     document.getElementById("result").append(updating);
     document.querySelector("main").classList.add("updating");
@@ -406,9 +321,9 @@ async function syncNow() {
 
 // ---------- Tabs ----------
 
-const views = ["overview", "next", "todo", "board", "log"];
+const views = ["overview", "next", "log"];
 
-// Shows one section and hides the others. The tab name goes in the address (#todo),
+// Shows one section and hides the others. The tab name goes in the address (#next),
 // so reloading the page keeps you on the same tab.
 function showView(name) {
   if (!views.includes(name)) name = "overview";

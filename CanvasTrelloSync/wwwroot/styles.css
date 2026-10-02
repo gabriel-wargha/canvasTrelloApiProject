@@ -188,18 +188,6 @@ main {
 }
 .tabs button:hover { color: var(--ink); }
 .tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
-.tab-count {
-  display: inline-block;
-  min-width: 1.5rem;
-  margin-left: 0.2rem;
-  padding: 0 0.35rem;
-  border-radius: 999px;
-  background: var(--rule);
-  color: var(--ink);
-  font-size: 0.8rem;
-  text-align: center;
-}
-.tab-count:empty { display: none; }
 
 .view { max-width: 52rem; }
 .view h1 {
@@ -252,31 +240,6 @@ main {
 
 .todo-course { font-family: var(--text); font-size: 0.95rem; font-weight: 700; color: var(--pencil); margin: 1.6rem 0 0.4rem; }
 .todo-course:first-child { margin-top: 0; }
-.todo-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); }
-.todo-list li { display: flex; align-items: center; gap: 0.5rem; border-bottom: 1px solid var(--rule); }
-.todo-row {
-  flex: 1;
-  display: grid;
-  grid-template-columns: 1.1rem 1fr auto;
-  align-items: start;
-  gap: 0.9rem;
-  padding: 0.85rem 0.5rem;
-  margin: 0 -0.5rem;
-  border-radius: 0.4rem;
-  text-decoration: none;
-}
-.todo-row:hover { background: var(--sheet); }
-.todo-row:hover .todo-go { color: var(--ink); }
-.todo-go { font-size: 0.9rem; color: var(--pencil); white-space: nowrap; }
-.todo-trello { font-size: 0.9rem; color: var(--pencil); white-space: nowrap; padding: 0.85rem 0 0.85rem 0.5rem; }
-.box {
-  width: 1.1rem;
-  height: 1.1rem;
-  margin-top: 0.2rem;
-  border: 2px solid var(--pencil);
-  border-radius: 0.2rem;
-}
-.todo-name { line-height: 1.4; }
 .course-tag { display: inline-flex; align-items: center; gap: 0.4rem; }
 .dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--course); flex: none; }
 
@@ -306,50 +269,6 @@ main.updating .view { opacity: 0.45; transition: opacity 0.2s; pointer-events: n
   font-weight: 700;
 }
 .next-links { display: flex; gap: 1rem; margin: 0; font-size: 0.92rem; }
-
-/* ---------- Board: index cards ---------- */
-.lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; }
-.list h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.6rem; }
-.list h3 span { font-family: var(--text); font-weight: 400; color: var(--pencil); }
-.list-cards { display: grid; gap: 0.6rem; padding: 2px 4px 4px 2px; }
-.index-card {
-  display: block;
-  padding: 0.55rem 0.7rem;
-  background: var(--sheet);
-  border: 1px solid var(--rule);
-  border-top: 4px solid var(--course, var(--pencil));
-  border-radius: 0.3rem;
-  box-shadow: 2px 2px 0 var(--rule);
-  font-size: 0.92rem;
-  line-height: 1.35;
-  text-decoration: none;
-  overflow-wrap: anywhere;
-}
-a.index-card:hover { box-shadow: 3px 3px 0 var(--pencil); }
-.list.done .index-card { color: var(--pencil); }
-/* The recommended next activity: first in its column, a bit bigger, with a highlighter label */
-.index-card.next { border-width: 2px; border-top-width: 6px; font-weight: 700; }
-.next-label {
-  display: block;
-  width: fit-content;
-  margin-bottom: 0.3rem;
-  padding: 0 0.3rem;
-  background: var(--highlight);
-  color: #1c2640;
-  border-radius: 0.2rem;
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.03em;
-  text-transform: uppercase;
-}
-.empty-list {
-  margin: 0;
-  padding: 1.2rem 0.8rem;
-  border: 1.5px dashed var(--rule);
-  border-radius: 0.3rem;
-  color: var(--pencil);
-  font-size: 0.9rem;
-}
 
 /* ---------- Sync log ---------- */
 .log-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--rule); max-width: 50rem; }
@@ -402,7 +321,6 @@ dialog p { margin: 0 0 1.2rem; }
   .toolbar-actions button.sync { flex: 1; }
   .tabs button { padding-left: 0.55rem; padding-right: 0.55rem; }
   .tabs button:first-child { margin-left: -0.55rem; }
-  .lists { grid-template-columns: 1fr; }
 }
 
 @media (prefers-reduced-motion: reduce) {

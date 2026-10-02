@@ -95,8 +95,6 @@ public class DashboardServer : IAsyncDisposable
         });
 
         app.MapGet("/api/summary", GetSummaryAsync);
-        app.MapGet("/api/assignments", GetAssignmentsAsync);
-        app.MapGet("/api/board", GetBoardAsync);
         app.MapGet("/api/history", GetHistoryAsync);
         app.MapGet("/api/next", GetNextAsync);
         app.MapPost("/api/sync", PostSyncAsync);
@@ -130,91 +128,6 @@ public class DashboardServer : IAsyncDisposable
             courses,
             failedCourses = canvas.FailedCourses,
         });
-    }
-
-    private async Task<IResult> GetAssignmentsAsync()
-    {
-        var canvas = await _sync.LoadCanvasAsync();
-        var state = await _sync.GetStateAsync();
-
-        var assignments = canvas.AllAssignments
-            .OrderBy(a => a.IsDone)
-            .ThenBy(a => a.CourseCode)
-            .Select(a =>
-            {
-                state.Cards.TryGetValue(a.Id, out var card);
-                return new
-                {
-                    id = a.Id,
-                    name = a.Name,
-                    course = a.CourseCode,
-                    canvasUrl = a.Url,
-                    submitted = a.IsDone,   // submitted on Canvas, or marked done by me
-                    card = card is null ? null : card.Done ? SyncService.DoneList : CourseLists.ListName(a.CourseName, a.CourseCode),
-                    cardUrl = card?.CardUrl,
-                };
-            });
-
-        return Results.Ok(assignments);
-    }
-
-    private async Task<IResult> GetBoardAsync()
-    {
-        // GetListsAsync only reads; EnsureListAsync would create a missing Done list, which a page view must never do
-        var lists = await _board.GetListsAsync();
-        var result = new List<object>();
-
-        var canvas = await _sync.LoadCanvasAsync();
-        var state = await _sync.GetStateAsync();
-
-        // The recommended next activity of each course, by its list name
-        var nextByList = new Dictionary<string, Assignment>(StringComparer.OrdinalIgnoreCase);
-        foreach (var course in canvas.Courses)
-        {
-            if (NextActivity.Pick(course.Assignments) is Assignment next)
-                nextByList.TryAdd(CourseLists.ListName(course.Course.Name, course.Course.CourseCode), next);
-        }
-
-        // One column per course, then the old shared Later (only while old cards are still in it), then Done
-        // A course list is a list named after one of my current courses
-        var names = canvas.Courses
-            .Select(c => CourseLists.ListName(c.Course.Name, c.Course.CourseCode))
-            .Where(lists.ContainsKey)
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .Order(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        names.Add(SyncService.LaterList);
-        names.Add(SyncService.DoneList);
-
-        foreach (string name in names)
-        {
-            var cards = lists.TryGetValue(name, out string? listId)
-                ? await _board.GetCardsAsync(listId)
-                : new List<TrelloCard>();
-
-            if (name == SyncService.LaterList && cards.Count == 0)
-                continue;
-
-            nextByList.TryGetValue(name, out var nextActivity);
-            SyncedCard? nextCard = null;
-            if (nextActivity != null)
-                state.Cards.TryGetValue(nextActivity.Id, out nextCard);
-
-            result.Add(new
-            {
-                name,
-                cards = cards.Select(c => new { id = c.Id, name = c.Name, url = c.Url }),
-                next = nextActivity is null ? null : new
-                {
-                    id = nextActivity.Id,
-                    name = nextActivity.Name,
-                    canvasUrl = nextActivity.Url,
-                    cardId = nextCard?.CardId,
-                },
-            });
-        }
-
-        return Results.Ok(new { lists = result });
     }
 
     // The Next tab: one recommended assignment per course, with its points

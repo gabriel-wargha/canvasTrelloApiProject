@@ -101,12 +101,11 @@ With `--dry-run`, the header shows a yellow **DRY RUN** badge and "Sync to Trell
 
 ### The web dashboard
 
-The dashboard is a plain HTML/CSS/JS page with no build step. It shows:
+The dashboard is a plain HTML/CSS/JS page with no build step. It has three tabs:
 
-- **Progress per course**: a bar showing how many assignments are done.
-- **To-do list**: open assignments, with links to Canvas and to the Trello card.
-- **Trello board**: a mirror of the Later and Done lists.
-- **Sync history**: the newest syncs first.
+- **Overview**: progress per course, showing how many assignments are done.
+- **Next**: one assignment per course to do next, with its points and links to Canvas and Trello.
+- **Sync log**: the newest syncs first.
 
 It also has a **Sync now** button and a light/dark mode switch, and it works on a phone-sized window.
 
@@ -115,8 +114,7 @@ It runs on a small JSON API, which you can also call with `curl`:
 | Endpoint | Returns |
 |---|---|
 | `GET /api/summary` | Board name, last sync time, progress per course, and courses that couldn't be read |
-| `GET /api/assignments` | Every assignment, whether it's submitted, and which list its card is in |
-| `GET /api/board` | The cards in Later and Done |
+| `GET /api/next` | One assignment per course to do next, with its points |
 | `GET /api/history` | The sync history, newest first |
 | `POST /api/sync` | Runs a sync and returns what was created, moved, and skipped |
 

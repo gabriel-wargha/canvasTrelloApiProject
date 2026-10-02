@@ -35,8 +35,6 @@
   <nav class="tabs" role="tablist" aria-label="Sections">
     <button type="button" role="tab" data-view="overview">Overview</button>
     <button type="button" role="tab" data-view="next">Next</button>
-    <button type="button" role="tab" data-view="todo">To do <span class="tab-count" id="todo-count"></span></button>
-    <button type="button" role="tab" data-view="board">Trello board</button>
     <button type="button" role="tab" data-view="log">Sync log</button>
   </nav>
 
@@ -55,16 +53,6 @@
       <h2>Do next</h2>
       <p class="subline">One assignment per course: the first one you haven't done yet.</p>
       <div id="next"><p class="quiet">Loading…</p></div>
-    </section>
-
-    <section class="view" id="view-todo" role="tabpanel" hidden>
-      <h2 id="todo-title">Still to do</h2>
-      <div id="todo"><p class="quiet">Loading…</p></div>
-    </section>
-
-    <section class="view" id="view-board" role="tabpanel" hidden>
-      <h2>On your Trello board</h2>
-      <div id="board"><p class="quiet">Loading…</p></div>
     </section>
 
     <section class="view" id="view-log" role="tabpanel" hidden>
