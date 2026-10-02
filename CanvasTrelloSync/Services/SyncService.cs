@@ -40,8 +40,6 @@ public class SyncService
 
     public Task<SyncState> GetStateAsync() => _store.LoadAsync();
 
-    public Task<List<Course>> GetCoursesAsync() => _source.GetCoursesAsync();
-
     // Locked too, so a reset can't happen in the middle of a sync
     public async Task ResetAsync()
     {

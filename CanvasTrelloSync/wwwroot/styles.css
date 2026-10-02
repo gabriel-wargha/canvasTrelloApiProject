@@ -300,6 +300,21 @@ main {
 }
 a.index-card:hover { box-shadow: 3px 3px 0 var(--pencil); }
 .list.done .index-card { color: var(--pencil); }
+/* The recommended next activity: first in its column, a bit bigger, with a highlighter label */
+.index-card.next { border-width: 2px; border-top-width: 6px; font-weight: 700; }
+.next-label {
+  display: block;
+  width: fit-content;
+  margin-bottom: 0.3rem;
+  padding: 0 0.3rem;
+  background: var(--highlight);
+  color: #1c2640;
+  border-radius: 0.2rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
 .empty-list {
   margin: 0;
   padding: 1.2rem 0.8rem;

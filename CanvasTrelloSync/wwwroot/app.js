@@ -198,10 +198,24 @@ function drawBoard(board) {
     title.append(el("span", null, `(${list.cards.length})`));
 
     const cards = el("div", "list-cards");
-    if (list.cards.length === 0) {
+
+    // The recommended next activity goes first. Its own card is taken out of the rest, so it shows once.
+    let rest = list.cards;
+    if (list.next) {
+      const nextCard = list.cards.find(c => c.id === list.next.cardId);
+      rest = list.cards.filter(c => c !== nextCard);
+
+      const next = link(nextCard?.url ?? list.next.canvasUrl, null, "index-card next");
+      next.append(el("span", "next-label", "⭐ Next up"), el("span", null, list.next.name));
+      const course = /^\[(.+?)\]/.exec(nextCard?.name ?? "");
+      if (course) next.style.setProperty("--course", colorFor(course[1]));
+      cards.append(next);
+    }
+
+    if (list.cards.length === 0 && !list.next) {
       cards.append(el("p", "empty-list", "Empty"));
     } else {
-      for (const card of list.cards) {
+      for (const card of rest) {
         // Our cards are named "[COURSE] Assignment": show the name, and use the course for the color
         const match = /^\[(.+?)\]\s*(.*)$/.exec(card.name);
         const node = link(card.url, match ? match[2] : card.name, "index-card");

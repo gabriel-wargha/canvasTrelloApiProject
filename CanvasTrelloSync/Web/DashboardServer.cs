@@ -154,10 +154,21 @@ public class DashboardServer : IAsyncDisposable
         var lists = await _board.GetListsAsync();
         var result = new List<object>();
 
+        var canvas = await _sync.LoadCanvasAsync();
+        var state = await _sync.GetStateAsync();
+
+        // The recommended next activity of each course, by its list name
+        var nextByList = new Dictionary<string, Assignment>(StringComparer.OrdinalIgnoreCase);
+        foreach (var course in canvas.Courses)
+        {
+            if (NextActivity.Pick(course.Assignments) is Assignment next)
+                nextByList.TryAdd(CourseLists.ListName(course.Course.Name, course.Course.CourseCode), next);
+        }
+
         // One column per course, then the old shared Later (only while old cards are still in it), then Done
         // A course list is a list named after one of my current courses
-        var names = (await _sync.GetCoursesAsync())
-            .Select(c => CourseLists.ListName(c.Name, c.CourseCode))
+        var names = canvas.Courses
+            .Select(c => CourseLists.ListName(c.Course.Name, c.Course.CourseCode))
             .Where(lists.ContainsKey)
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Order(StringComparer.OrdinalIgnoreCase)
@@ -174,10 +185,22 @@ public class DashboardServer : IAsyncDisposable
             if (name == SyncService.LaterList && cards.Count == 0)
                 continue;
 
+            nextByList.TryGetValue(name, out var nextActivity);
+            SyncedCard? nextCard = null;
+            if (nextActivity != null)
+                state.Cards.TryGetValue(nextActivity.Id, out nextCard);
+
             result.Add(new
             {
                 name,
                 cards = cards.Select(c => new { id = c.Id, name = c.Name, url = c.Url }),
+                next = nextActivity is null ? null : new
+                {
+                    id = nextActivity.Id,
+                    name = nextActivity.Name,
+                    canvasUrl = nextActivity.Url,
+                    cardId = nextCard?.CardId,
+                },
             });
         }
 

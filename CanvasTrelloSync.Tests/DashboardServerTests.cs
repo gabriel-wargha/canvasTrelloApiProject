@@ -114,6 +114,25 @@ public class DashboardServerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task GetBoard_CourseList_IncludesNextActivityWithItsCard()
+    {
+        FakeTaskSource.Submit(_source.AddTodo(101));
+        _source.AddTodo(102);
+        _source.AddTodo(103);
+        await _sync.SyncAsync(dryRun: false, trigger: "terminal");
+        var client = await StartServerAsync();
+
+        var json = await client.GetFromJsonAsync<JsonElement>("/api/board");
+
+        var lists = json.GetProperty("lists");
+        var next = lists[0].GetProperty("next");
+        Assert.Equal(102, next.GetProperty("id").GetInt64());
+        Assert.Equal("Assignment 102", next.GetProperty("name").GetString());
+        Assert.Equal("card-102", next.GetProperty("cardId").GetString());
+        Assert.Equal(JsonValueKind.Null, lists[1].GetProperty("next").ValueKind);   // Done has no next activity
+    }
+
+    [Fact]
     public async Task GetHistory_TwoRuns_ReturnsNewestFirst()
     {
         await _sync.SyncAsync(dryRun: false, trigger: "terminal");
