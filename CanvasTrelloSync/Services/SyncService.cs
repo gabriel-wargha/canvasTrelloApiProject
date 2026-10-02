@@ -57,12 +57,15 @@ public class SyncService
     public async Task<CanvasSnapshot> LoadCanvasAsync()
     {
         var snapshot = new CanvasSnapshot();
+        var state = await _store.LoadAsync();
 
         foreach (var course in await _source.GetCoursesAsync())
         {
             try
             {
                 var assignments = await _source.GetAssignmentsAsync(course);
+                foreach (var assignment in assignments)
+                    assignment.MarkedDone = state.Cards.TryGetValue(assignment.Id, out var card) && card.Done;
                 snapshot.Courses.Add(new CourseAssignments { Course = course, Assignments = assignments });
             }
             catch (HttpRequestException)

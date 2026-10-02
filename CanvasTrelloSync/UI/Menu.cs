@@ -175,7 +175,7 @@ public class Menu
         // Courses with no assignments are just noise, so hide them
         foreach (var item in canvas.Courses.Where(c => c.Assignments.Count > 0))
         {
-            int done = item.Assignments.Count(a => a.IsSubmitted);
+            int done = item.Assignments.Count(a => a.IsDone);
             table.AddRow(
                 Markup.Escape(item.Course.CourseCode ?? "?"),
                 Markup.Escape(item.Course.Name ?? "(no name)"),
@@ -199,21 +199,21 @@ public class Menu
         table.AddColumn("Card");
 
         // To-do first
-        foreach (var a in canvas.AllAssignments.OrderBy(a => a.IsSubmitted).ThenBy(a => a.CourseCode))
+        foreach (var a in canvas.AllAssignments.OrderBy(a => a.IsDone).ThenBy(a => a.CourseCode))
         {
             string card = !state.Cards.TryGetValue(a.Id, out var synced) ? "[grey]—[/]"
                 : synced.Done ? "[green]Done[/]"
                 : $"[blue]{Markup.Escape(CourseLists.ListName(a.CourseName, a.CourseCode))}[/]";
 
             table.AddRow(
-                a.IsSubmitted ? "[green]✅ done[/]" : "[yellow]⏳ todo[/]",
+                a.IsDone ? "[green]✅ done[/]" : "[yellow]⏳ todo[/]",
                 Markup.Escape(a.CourseCode ?? "?"),
                 Markup.Escape(a.Name ?? "(no name)"),
                 card);
         }
 
         AnsiConsole.Write(table);
-        int todo = canvas.AllAssignments.Count(a => !a.IsSubmitted);
+        int todo = canvas.AllAssignments.Count(a => !a.IsDone);
         AnsiConsole.MarkupLine($"Total: [bold]{canvas.AllAssignments.Count()}[/] assignments, [yellow]{todo} to do[/].");
         ShowFailedCourses(canvas.FailedCourses);
     }

@@ -114,7 +114,7 @@ public class DashboardServer : IAsyncDisposable
             {
                 Code = c.Course.CourseCode ?? c.Course.Id.ToString(),
                 Name = c.Course.Name ?? "",
-                Done = c.Assignments.Count(a => a.IsSubmitted),
+                Done = c.Assignments.Count(a => a.IsDone),
                 Total = c.Assignments.Count,
             })
             .ToList();
@@ -137,7 +137,7 @@ public class DashboardServer : IAsyncDisposable
         var state = await _sync.GetStateAsync();
 
         var assignments = canvas.AllAssignments
-            .OrderBy(a => a.IsSubmitted)
+            .OrderBy(a => a.IsDone)
             .ThenBy(a => a.CourseCode)
             .Select(a =>
             {
@@ -148,7 +148,7 @@ public class DashboardServer : IAsyncDisposable
                     name = a.Name,
                     course = a.CourseCode,
                     canvasUrl = a.Url,
-                    submitted = a.IsSubmitted,
+                    submitted = a.IsDone,   // submitted on Canvas, or marked done by me
                     card = card is null ? null : card.Done ? SyncService.DoneList : CourseLists.ListName(a.CourseName, a.CourseCode),
                     cardUrl = card?.CardUrl,
                 };

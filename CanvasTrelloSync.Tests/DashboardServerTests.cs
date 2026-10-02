@@ -64,6 +64,27 @@ public class DashboardServerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task GetSummaryAndAssignments_CardMarkedDone_CountItAsDone()
+    {
+        _source.AddTodo(101);
+        _source.AddTodo(102);
+        await _sync.SyncAsync(dryRun: false, trigger: "terminal");
+        var state = await _store.LoadAsync();
+        state.Cards[101].Done = true;
+        await _store.SaveAsync(state);
+        var client = await StartServerAsync();
+
+        var summary = await client.GetFromJsonAsync<JsonElement>("/api/summary");
+        var assignments = await client.GetFromJsonAsync<JsonElement>("/api/assignments");
+
+        Assert.Equal(1, summary.GetProperty("done").GetInt32());
+        var byId = assignments.EnumerateArray().ToDictionary(a => a.GetProperty("id").GetInt64());
+        Assert.True(byId[101].GetProperty("submitted").GetBoolean());
+        Assert.Equal("Done", byId[101].GetProperty("card").GetString());
+        Assert.False(byId[102].GetProperty("submitted").GetBoolean());
+    }
+
+    [Fact]
     public async Task GetAssignments_AfterSync_ShowsWhichListEachCardIsIn()
     {
         _source.AddTodo(101);

@@ -397,6 +397,46 @@ public class SyncServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task LoadCanvasAsync_CardMarkedDoneButNotSubmitted_CountsAsDone()
+    {
+        _source.AddTodo(101);
+        _source.AddTodo(102);
+        await _sync.SyncAsync(dryRun: false, trigger: "terminal");
+        await MarkDoneAsync(101);
+
+        var canvas = await _sync.LoadCanvasAsync();
+
+        var byId = canvas.AllAssignments.ToDictionary(a => a.Id);
+        Assert.True(byId[101].IsDone);
+        Assert.False(byId[101].IsSubmitted);
+        Assert.False(byId[102].IsDone);
+    }
+
+    [Fact]
+    public async Task SyncAsync_CardMarkedDoneButNotSubmitted_LeavesItAlone()
+    {
+        _source.AddTodo(101);
+        await _sync.SyncAsync(dryRun: false, trigger: "terminal");
+        await MarkDoneAsync(101);
+        int writesBefore = _board.WriteCalls;
+
+        var result = await _sync.SyncAsync(dryRun: false, trigger: "terminal");
+
+        Assert.Empty(result.Created);
+        Assert.Empty(result.Moved);
+        Assert.Empty(result.Regrouped);
+        Assert.Equal(1, result.Skipped);
+        Assert.Equal(writesBefore, _board.WriteCalls);
+    }
+
+    private async Task MarkDoneAsync(long assignmentId)
+    {
+        var state = await _store.LoadAsync();
+        state.Cards[assignmentId].Done = true;
+        await _store.SaveAsync(state);
+    }
+
+    [Fact]
     public async Task LoadCanvasAsync_OneCourseFails_ReturnsOtherCoursesAndFailedName()
     {
         _source.AddTodo(101, courseId: 1);

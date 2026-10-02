@@ -17,6 +17,13 @@ public class Assignment
     public string? CourseName { get; set; }
 
     public bool IsSubmitted => Submission?.WorkflowState is "submitted" or "graded" or "pending_review";
+
+    // True when its card was moved to Done without a Canvas submission (I decided to skip it).
+    // Filled in by SyncService.LoadCanvasAsync from the sync state.
+    public bool MarkedDone { get; set; }
+
+    // Done for the menu and the dashboard: submitted on Canvas, or marked done by me
+    public bool IsDone => IsSubmitted || MarkedDone;
     public string CardTitle => $"[{CourseCode}] {Name}";
 
     public override string ToString()

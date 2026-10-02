@@ -43,6 +43,15 @@ public class NextActivityTests
     }
 
     [Fact]
+    public void Pick_FirstIsMarkedDone_SkipsIt()
+    {
+        var assignments = new List<Assignment> { Todo(1), Todo(2) };
+        assignments[0].MarkedDone = true;
+
+        Assert.Equal(2, NextActivity.Pick(assignments)?.Id);
+    }
+
+    [Fact]
     public void Pick_EverythingSubmitted_ReturnsNull()
     {
         Assert.Null(NextActivity.Pick(new List<Assignment> { Submitted(1), Submitted(2) }));
