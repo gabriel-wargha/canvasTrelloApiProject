@@ -280,6 +280,10 @@ main {
 .course-tag { display: inline-flex; align-items: center; gap: 0.4rem; }
 .dot { width: 0.6rem; height: 0.6rem; border-radius: 50%; background: var(--course); flex: none; }
 
+/* While the page reloads after a sync: everything but the result box fades */
+main.updating .view { opacity: 0.45; transition: opacity 0.2s; pointer-events: none; }
+.updating-note { margin: 0.4rem 0 0; color: var(--pencil); font-size: 0.9rem; }
+
 /* ---------- Board: index cards ---------- */
 .lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; }
 .list h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.6rem; }

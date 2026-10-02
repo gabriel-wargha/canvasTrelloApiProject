@@ -344,7 +344,18 @@ async function syncNow() {
 
   try {
     drawResult(await api("/api/sync", { method: "POST" }));
-    await loadAll();
+
+    // Reloading reads Canvas again and takes a few seconds: fade the sections and say so,
+    // so the old board (and its old Next up star) doesn't look final
+    const updating = el("p", "updating-note", "Updating the page…");
+    document.getElementById("result").append(updating);
+    document.querySelector("main").classList.add("updating");
+    try {
+      await loadAll();
+    } finally {
+      updating.remove();
+      document.querySelector("main").classList.remove("updating");
+    }
   } catch (error) {
     const box = document.getElementById("result");
     box.className = "result failed";
