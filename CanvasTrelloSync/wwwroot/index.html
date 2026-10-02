@@ -34,6 +34,7 @@
   <!-- One tab per section, so the page shows one thing at a time -->
   <nav class="tabs" role="tablist" aria-label="Sections">
     <button type="button" role="tab" data-view="overview">Overview</button>
+    <button type="button" role="tab" data-view="next">Next</button>
     <button type="button" role="tab" data-view="todo">To do <span class="tab-count" id="todo-count"></span></button>
     <button type="button" role="tab" data-view="board">Trello board</button>
     <button type="button" role="tab" data-view="log">Sync log</button>
@@ -48,6 +49,12 @@
       <p class="subline" id="subline"></p>
       <h2>Your courses</h2>
       <div id="courses"><p class="quiet">Loading…</p></div>
+    </section>
+
+    <section class="view" id="view-next" role="tabpanel" hidden>
+      <h2>Do next</h2>
+      <p class="subline">One assignment per course: the first one you haven't done yet.</p>
+      <div id="next"><p class="quiet">Loading…</p></div>
     </section>
 
     <section class="view" id="view-todo" role="tabpanel" hidden>

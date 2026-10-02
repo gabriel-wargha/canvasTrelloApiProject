@@ -168,6 +168,42 @@ public class DashboardServerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task GetNext_TwoCourses_ReturnsOneNextAssignmentPerCourseWithPoints()
+    {
+        FakeTaskSource.Submit(_source.AddTodo(101, courseId: 1));
+        var next = _source.AddTodo(102, courseId: 1);
+        next.Points = 10;
+        _source.AddTodo(103, courseId: 1);
+        _source.AddTodo(201, courseId: 2);
+        await _sync.SyncAsync(dryRun: false, trigger: "terminal");
+        var client = await StartServerAsync();
+
+        var json = await client.GetFromJsonAsync<JsonElement>("/api/next");
+
+        Assert.Equal(2, json.GetArrayLength());
+        var first = json[0];
+        Assert.Equal("C1", first.GetProperty("course").GetString());
+        Assert.Equal("Course 1", first.GetProperty("courseName").GetString());
+        Assert.Equal(102, first.GetProperty("id").GetInt64());
+        Assert.Equal(10, first.GetProperty("points").GetDouble());
+        Assert.False(first.TryGetProperty("description", out _));
+        Assert.Equal("https://trello.test/c/102", first.GetProperty("cardUrl").GetString());
+        Assert.Equal(201, json[1].GetProperty("id").GetInt64());
+    }
+
+    [Fact]
+    public async Task GetNext_CourseAllDone_LeavesItOut()
+    {
+        FakeTaskSource.Submit(_source.AddTodo(101, courseId: 1));
+        _source.AddTodo(201, courseId: 2);
+        var client = await StartServerAsync();
+
+        var json = await client.GetFromJsonAsync<JsonElement>("/api/next");
+
+        Assert.Equal(201, Assert.Single(json.EnumerateArray()).GetProperty("id").GetInt64());
+    }
+
+    [Fact]
     public async Task GetHistory_TwoRuns_ReturnsNewestFirst()
     {
         await _sync.SyncAsync(dryRun: false, trigger: "terminal");

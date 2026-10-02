@@ -284,6 +284,29 @@ main {
 main.updating .view { opacity: 0.45; transition: opacity 0.2s; pointer-events: none; }
 .updating-note { margin: 0.4rem 0 0; color: var(--pencil); font-size: 0.9rem; }
 
+/* ---------- Next: one card per course ---------- */
+.next-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr)); gap: 1rem; }
+.next-item {
+  padding: 1rem 1.1rem;
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  border-top: 6px solid var(--course, var(--pencil));
+  border-radius: 0.4rem;
+  min-width: 0;
+}
+.next-name { margin: 0.2rem 0 0.3rem; font-size: 1.1rem; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
+.next-points {
+  display: inline-block;
+  margin: 0 0 0.7rem;
+  padding: 0 0.4rem;
+  background: var(--highlight);
+  color: #1c2640;
+  border-radius: 0.2rem;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+.next-links { display: flex; gap: 1rem; margin: 0; font-size: 0.92rem; }
+
 /* ---------- Board: index cards ---------- */
 .lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); gap: 1rem; }
 .list h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.6rem; }

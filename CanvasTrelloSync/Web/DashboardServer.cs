@@ -98,6 +98,7 @@ public class DashboardServer : IAsyncDisposable
         app.MapGet("/api/assignments", GetAssignmentsAsync);
         app.MapGet("/api/board", GetBoardAsync);
         app.MapGet("/api/history", GetHistoryAsync);
+        app.MapGet("/api/next", GetNextAsync);
         app.MapPost("/api/sync", PostSyncAsync);
 
         return app;
@@ -214,6 +215,34 @@ public class DashboardServer : IAsyncDisposable
         }
 
         return Results.Ok(new { lists = result });
+    }
+
+    // The Next tab: one recommended assignment per course, with its points
+    private async Task<IResult> GetNextAsync()
+    {
+        var canvas = await _sync.LoadCanvasAsync();
+        var state = await _sync.GetStateAsync();
+        var result = new List<object>();
+
+        foreach (var course in canvas.Courses)
+        {
+            if (NextActivity.Pick(course.Assignments) is not Assignment next)
+                continue;
+
+            state.Cards.TryGetValue(next.Id, out var card);
+            result.Add(new
+            {
+                course = next.CourseCode,
+                courseName = course.Course.Name,
+                id = next.Id,
+                name = next.Name,
+                points = next.Points,
+                canvasUrl = next.Url,
+                cardUrl = card?.CardUrl,
+            });
+        }
+
+        return Results.Ok(result);
     }
 
     private async Task<IResult> GetHistoryAsync()

@@ -189,6 +189,40 @@ function drawTodo(assignments) {
   box.replaceChildren(wrap);
 }
 
+// The Next tab: one card per course with the assignment to do next and its points
+function drawNext(items) {
+  const box = document.getElementById("next");
+  if (items.length === 0) {
+    box.replaceChildren(el("p", "quiet", "Nothing left. Every assignment is done."));
+    return;
+  }
+
+  const grid = el("div", "next-grid");
+  for (const item of items) {
+    const card = el("article", "next-item");
+    card.style.setProperty("--course", colorFor(item.course));
+
+    const heading = el("h3", "todo-course");
+    heading.append(courseTag(item.course));
+
+    const points = item.points === null || item.points === undefined
+      ? "No points"
+      : plural(item.points, "point");
+
+    const links = el("p", "next-links");
+    links.append(link(item.canvasUrl, "Open in Canvas ↗"));
+    if (item.cardUrl) links.append(link(item.cardUrl, "Trello ↗"));
+
+    card.append(
+      heading,
+      el("p", "next-name", item.name),
+      el("p", "next-points", points),
+      links);
+    grid.append(card);
+  }
+  box.replaceChildren(grid);
+}
+
 function drawBoard(board) {
   const lists = el("div", "lists");
 
@@ -260,6 +294,7 @@ async function loadAll() {
   const requests = {
     assignments: api("/api/assignments"),
     board: api("/api/board"),
+    next: api("/api/next"),
     history: api("/api/history"),
   };
 
@@ -274,6 +309,7 @@ async function loadAll() {
   await Promise.all([
     requests.assignments.then(drawTodo, error => showError("todo", "your assignments", error)),
     requests.board.then(drawBoard, error => showError("board", "the Trello board", error)),
+    requests.next.then(drawNext, error => showError("next", "what to do next", error)),
     requests.history.then(drawHistory, error => showError("history", "the sync log", error)),
   ]);
 }
@@ -370,7 +406,7 @@ async function syncNow() {
 
 // ---------- Tabs ----------
 
-const views = ["overview", "todo", "board", "log"];
+const views = ["overview", "next", "todo", "board", "log"];
 
 // Shows one section and hides the others. The tab name goes in the address (#todo),
 // so reloading the page keeps you on the same tab.
