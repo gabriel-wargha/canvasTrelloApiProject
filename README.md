@@ -4,21 +4,64 @@ A learning project about consuming third-party REST APIs in C#.
 
 **CanvasTrelloSync** is a .NET 8 app that reads my assignments from [Canvas Network](https://learn.canvas.net) and keeps a [Trello](https://trello.com) board up to date:
 
-- Every assignment I haven't submitted yet gets a Trello card in the **Later** list.
+- Every assignment I haven't submitted yet gets a Trello card in a list named after its course.
 - When I submit an assignment on Canvas, the next sync moves its card to **Done**.
 - The app remembers which cards it made, so it never creates the same card twice.
 
 You can use it from a **terminal menu** or from a **web dashboard** at `http://localhost:5080`. Both use the same sync engine.
 
+![System design: two front doors share one engine; the engine only sees three interfaces](docs/images/system-design.png)
+
+---
+
+## For reviewers
+
+**Try it in 30 seconds, with no accounts:**
+
+```bash
+cd CanvasTrelloSync
+dotnet build
+dotnet test ../CanvasTrelloSync.Tests    # 77 tests, no secrets, no internet
+```
+
+**Where to look first:**
+
+| File | Why it's interesting |
+|---|---|
+| [`Services/SyncService.cs`](CanvasTrelloSync/Services/SyncService.cs) | The engine: the four sync rules, dry run, the lock, saving progress when Trello fails |
+| [`Interfaces/`](CanvasTrelloSync/Interfaces) | `ITaskSource` and `ITaskBoard`: the seams that make the engine testable |
+| [`Clients/CanvasClient.cs`](CanvasTrelloSync/Clients/CanvasClient.cs) | Bearer auth and `Link`-header pagination |
+| [`Clients/TrelloClient.cs`](CanvasTrelloSync/Clients/TrelloClient.cs) | One `SendAsync` for auth and errors; the token never reaches an error message |
+| [`Services/SqliteSyncStateStore.cs`](CanvasTrelloSync/Services/SqliteSyncStateStore.cs) | Plain parameterized SQL in one transaction, plus a one-time import from the old JSON file |
+| [`CanvasTrelloSync.Tests/SyncServiceTests.cs`](CanvasTrelloSync.Tests/SyncServiceTests.cs) | The engine tested with `FakeTaskSource` and `FakeTaskBoard` |
+
+**Key design decisions:**
+
+- **Depend on interfaces, not APIs.** `SyncService` only knows `ITaskSource`, `ITaskBoard` and `ISyncStateStore`. Tests plug in fakes, and storage moved from a JSON file to SQLite without touching the engine, the menu or the dashboard.
+- **Idempotent sync.** The app stores which card belongs to which assignment, so running a sync twice changes nothing the second time.
+- **Safe by default.** `--dry-run` runs the exact same rules but skips every write. The `ITaskBoard` interface has no delete method, so the app can't remove cards.
+- **No duplicates under concurrency.** The terminal and the dashboard share one `SyncService`, and a `SemaphoreSlim` lets only one sync (or reset) run at a time.
+- **Partial failure is handled.** If Trello fails halfway, the cards already made are saved before the error is rethrown, so the next sync doesn't create them again.
+- **Secrets stay secret.** Keys live in `dotnet user-secrets`, outside the repo. Logs and errors include the URL path only, never the token. `POST /api/sync` returns `403` when the request comes from another website, so a random page can't start a sync.
+- **Fail soft on bad data.** Some Canvas Network courses block assignment access; those are skipped and reported, and the rest still sync.
+
+**Trade-offs and what I'd do next:**
+
+- The sync is **pull-based** (run by hand or from the dashboard). Canvas webhooks or a scheduled job would keep the board fresh without a click.
+- State is a **local SQLite file** for one user. A multi-user version would need a server database and per-user tokens (OAuth instead of personal tokens).
+- Canvas and Trello calls are **sequential**. Fetching course assignments in parallel, with retry and backoff for rate limits (HTTP 429), would make large syncs faster and sturdier.
+
 ---
 
 ## Contents
 
-1. [Quick start](#quick-start)
-2. [Setup in detail](#setup-in-detail)
-3. [Ways to run it](#ways-to-run-it)
-4. [How it works](#how-it-works)
-5. [Project structure](#project-structure)
+1. [For reviewers](#for-reviewers)
+2. [Quick start](#quick-start)
+3. [Setup in detail](#setup-in-detail)
+4. [Ways to run it](#ways-to-run-it)
+5. [How it works](#how-it-works)
+6. [Testing](#testing)
+7. [Project structure](#project-structure)
 
 ---
 
@@ -52,7 +95,7 @@ dotnet run -- --dry-run
 
 - **.NET 8 SDK.** The version is pinned in [`global.json`](global.json) (`8.0.404`). Check with `dotnet --version`.
 - A **Canvas Network** account with at least one active course (only needed to run the app).
-- A **Trello** account with a board that has a list named **`Later`**. You don't need to create a `Done` list, because the app makes it when the first card needs to move.
+- A **Trello** account with a board. You don't need to create any lists: the app makes one list per course, and a `Done` list, when the first card needs them.
 
 ### Secrets
 
@@ -157,17 +200,18 @@ The important design idea is **interfaces**. `SyncService` only knows about `ITa
 
 ### The sync rules
 
-For each assignment, `SyncService` checks what Canvas says and what it remembers, and applies **one** of three rules:
+For each assignment, `SyncService` checks what Canvas says and what it remembers, and applies **one** of four rules:
 
 | # | Situation | Action |
 |---|---|---|
-| 1 | Not submitted, and it has no card yet | Create a card in **Later** |
+| 1 | It has no card yet | Create a card in its course's list (or straight in **Done** if it's already submitted) |
 | 2 | Submitted, and its card is still open | Move the card to **Done** (create the Done list first if it's missing) |
-| 3 | Anything else | Skip it |
+| 3 | Still to do, but its card is in the old shared **Later** list | Move the card to its course's list (a one-time migration) |
+| 4 | Anything else | Skip it |
 
-An assignment counts as submitted when Canvas says its state is `submitted`, `graded` or `pending_review`.
+An assignment counts as submitted when Canvas says its state is `submitted`, `graded` or `pending_review`. Course lists are named after the course, cut at a whole word if the name is long (`Services/CourseLists.cs`).
 
-**Example.** On Monday you have 3 open assignments. The first sync creates 3 cards in Later. On Tuesday you submit one. The next sync moves that one card to Done and skips the other two. A third sync changes nothing.
+**Example.** On Monday you have 3 open assignments. The first sync creates 3 cards in their course lists. On Tuesday you submit one. The next sync moves that one card to Done and skips the other two. A third sync changes nothing.
 
 ### What the app remembers
 
@@ -193,6 +237,24 @@ Earlier versions stored the same data in `sync-state.json`. On the first real ru
 
 ---
 
+## Testing
+
+```bash
+cd CanvasTrelloSync
+dotnet test ../CanvasTrelloSync.Tests
+```
+
+All 77 tests run offline with no secrets:
+
+- **`SyncServiceTests`**: every sync rule, dry run, history, the lock, and saving progress when Trello fails halfway, using `FakeTaskSource` and `FakeTaskBoard`.
+- **`SqliteSyncStateStoreTests` / `JsonSyncStateStoreTests` / `SyncStateStoreTests`**: the stores, using in-memory SQLite and temp files, plus the JSON-to-SQLite import.
+- **`DashboardServerTests`**: the JSON API endpoints and static file handling.
+- **`CourseListsTests` / `NextActivityTests`**: list naming and the "what to do next" pick.
+
+Tests are named `Method_Condition_ExpectedResult`, and bugs are fixed test-first: a failing test, then the fix.
+
+---
+
 ## Project structure
 
 ```
@@ -209,6 +271,7 @@ canvasTrelloApiProject/
 ├── CanvasTrelloSync.Tests/        xUnit tests
 │   └── Fakes/                     FakeTaskSource, FakeTaskBoard
 ├── docs/PLAN.md                   the build plan, block by block
+├── docs/images/                   the system design diagram
 ├── .claude/skills/api-reference/  notes on the Canvas and Trello APIs
 ├── AGENTS.md / CLAUDE.md          instructions for the AI assistant used on this project
 └── global.json                    pins the .NET SDK version
